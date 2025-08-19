@@ -1,0 +1,31 @@
+# Build artifacts
+/build/
+/bin/
+*.o
+*.obj
+*.exe
+game
+a.out
+*.out
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Editor / OS
+.vscode/
+*.swp
+.DS_Store
+*.log
+
+# Optional: ignore IDE specific
+.idea/
+*.iml
+
+# Keep media (png) in repo
+!*.png
+
+# Formatting file
+*.clang-format
