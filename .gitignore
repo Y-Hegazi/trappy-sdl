@@ -29,3 +29,6 @@ Makefile
 
 # Formatting file
 *.clang-format
+
+# garbage files
+garbage

@@ -103,23 +103,10 @@ void RectPlayer::setSize(float width, float height) {
  * rendering This avoids directional bias (where negative movements round
  * differently than positive)
  */
-void RectPlayer::setPos(int x, int y) {
-  // Update precise float position (used for physics calculations)
-  pos_x = (float)x;
-  pos_y = (float)y;
 
-  // Sync integer render position using proper rounding (not truncation)
-  // std::lround rounds to nearest integer, avoiding negative/positive bias
-  rect.x = static_cast<int>(std::lround(pos_x));
-  rect.y = static_cast<int>(std::lround(pos_y));
-}
 // === Getter implementations - Simple accessor functions ===
 
 std::pair<float, float> RectPlayer::getSize() const { return {rect.w, rect.h}; }
-
-std::pair<float, float> RectPlayer::getPos() const { return {pos_x, pos_y}; }
-
-std::pair<int, int> RectPlayer::getRealPos() const { return {rect.x, rect.y}; }
 
 /**
  * Core update function - Apply velocity to position and sync render coordinates
@@ -210,4 +197,43 @@ void RectPlayer::resetDash() {
   dashing = false;
   dashTimer = 0.f;
   dashCooldownTimer = 0.f;
+}
+
+// === Collideable interface implementation ===
+
+SDL_FRect RectPlayer::getCollisionBounds() const { return rect; }
+
+std::pair<float, float> RectPlayer::getPos() const { return {pos_x, pos_y}; }
+
+void RectPlayer::setPos(float x, float y) {
+  pos_x = x;
+  pos_y = y;
+  rect.x = x;
+  rect.y = y;
+  if (sprite)
+    sprite->setPosition(x, y);
+}
+
+void RectPlayer::onCollision(Collideable *other, float normalX, float normalY,
+                             float penetration) {
+  // For now, simple collision response
+  // Stop movement in the direction of collision normal
+  if (std::abs(normalY) > 0.5f) {
+    // Vertical collision
+    if (normalY < 0.f) {
+      // Landing on top of something
+      vel_y = 0.f;
+      setGrounded(true);
+      resetJump();
+    } else {
+      // Hit from below
+      if (vel_y < 0.f)
+        vel_y = 0.f;
+      setGrounded(false);
+    }
+  } else if (std::abs(normalX) > 0.5f) {
+    // Horizontal collision - stop horizontal movement
+    vel_x = 0.f;
+    setGrounded(false);
+  }
 }

@@ -1,8 +1,9 @@
 #include "../include/game.h"
+#include "../include/collision_system.h"
+#include "../include/platform.h"
 #include <SDL2/SDL_image.h>
 #include <iostream>
 #include <memory>
-
 /**
  * Game Constructor - Initialize SDL and create window/renderer
  *
@@ -49,6 +50,9 @@ Game::Game(const char *name, const char *playerTexture, int windowWidth,
 
   // Initialize high-resolution timer for precise delta time calculation
   perfFreq = SDL_GetPerformanceFrequency();
+  auto tex2 = std::make_shared<Texture>(renderer.get(), "Grass_01.png");
+  platform = new Platform({00, 250, 900, 50}, tex2);
+  platform2 = new Platform({150, 150, 150, 200}, tex2);
 }
 /**
  * Handle SDL events - Process user input and system events
@@ -165,13 +169,15 @@ void Game::updatePlayerPos(float dt) {
   temp.w = static_cast<int>(lround(player->getRect().w));
   temp.h = static_cast<int>(lround(player->getRect().h));
 
-  // Simple collision check (will be enhanced with side-aware logic)
-  if (SDL_HasIntersection(&temp, &floor) && vel_y > 0) {
-    player->stopFalling();     // Set vertical velocity to 0
-    player->setGrounded(true); // Mark player as on ground
-    player->resetJump();
-  } else
-    player->setGrounded(false); // Reset ground state if not on floor
+  // // Simple collision check (will be enhanced with side-aware logic)
+  // if (SDL_HasIntersection(&temp, &floor) && vel_y > 0) {
+  //   player->stopFalling();     // Set vertical velocity to 0
+  //   player->setGrounded(true); // Mark player as on ground
+  //   player->resetJump();
+  // } else
+  //   player->setGrounded(false); // Reset ground state if not on floor
+  std::vector<Collideable *> colliders = {platform, platform2};
+  CollisionSystem::resolveCollisions(player.get(), colliders);
 
   // Apply movement and handle collisions
   player->update(dt, vel_x, vel_y, dash);
@@ -234,7 +240,15 @@ void Game::run() {
     SDL_SetRenderDrawColor(renderer.get(), 0, 0, 0, 255);
     SDL_RenderFillRect(renderer.get(), &floor);
     player->render(renderer.get()); // Second render for layering
-
+    platform->getSprite()->setDestRect(platform->getCollisionBounds());
+    platform->getSprite()->setSrcRect({0, 0, 500, 500});
+    platform->getSprite()->render(renderer.get());
+    platform->getSprite()->setDestRect(platform->getCollisionBounds());
+    platform->getSprite()->setSrcRect({0, 0, 500, 500});
+    platform->getSprite()->render(renderer.get());
+    platform2->getSprite()->setDestRect(platform2->getCollisionBounds());
+    platform2->getSprite()->setSrcRect({0, 0, 500, 500});
+    platform2->getSprite()->render(renderer.get());
     // Present completed frame
     SDL_RenderPresent(renderer.get());
   }

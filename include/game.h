@@ -2,10 +2,10 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include "platform.h"
 #include "player.h"
 #include <SDL2/SDL_image.h>
 #include <memory>
-
 /**
  * SubSystemWrapper - RAII wrapper for SDL subsystem initialization and cleanup
  *
@@ -112,6 +112,8 @@ private:
 
   std::unique_ptr<RectPlayer> player =
       nullptr; // Smart pointer for automatic cleanup
+  Platform *platform;
+  Platform *platform2;
 
   // === Timing and Performance ===
   Uint64 perfFreq; // SDL performance counter frequency (for delta time

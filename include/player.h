@@ -1,6 +1,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
+#include "collideable.h"
 #include "sprite.h"
 #include "texture.h"
 #include <SDL2/SDL.h>
@@ -21,8 +22,9 @@ enum class MovementState { IDLE, MOVING, JUMPING, CROUCHING };
  * - Syncs to integer SDL_Rect for rendering (avoids rounding bias)
  * - Separates velocity from position for physics-based movement
  * - Supports running multiplier and jump mechanics
+ * - Implements Collideable interface for collision system
  */
-class RectPlayer {
+class RectPlayer : public Collideable {
 private:
   MovementState state = MovementState::IDLE;
   std::shared_ptr<Texture> texture;
@@ -88,30 +90,12 @@ public:
    */
   std::pair<float, float> getSize() const;
 
-  /**
-   * Get precise floating-point position
-   * @return pair<x, y> as floats - the "true" position used for physics
-   */
-  std::pair<float, float> getPos() const;
-
-  /**
-   * Get integer rendering position (from SDL_Rect)
-   * @return pair<x, y> as integers - the position actually drawn on screen
-   */
-  std::pair<int, int> getRealPos() const;
-
   // === Setters - Modify player state ===
 
   /**
    * Set player dimensions and update both internal cache and SDL_Rect
    */
   void setSize(float width, float height);
-
-  /**
-   * Set player position - updates both float and integer coordinates
-   * @param x, y New position in pixels
-   */
-  void setPos(int x, int y);
 
   /**
    * Get read-only pointer to SDL_Rect for rendering
@@ -241,6 +225,49 @@ public:
   void resetDash();
   void setState(MovementState state);
   Sprite *getSprite() const { return sprite.get(); };
+
+  // === Collideable interface implementation ===
+
+  /**
+   * Get collision bounds for this player
+   * @return SDL_FRect representing player's collision box
+   */
+  SDL_FRect getCollisionBounds() const override;
+
+  /**
+   * Get current position
+   * @return pair<x, y> as floats
+   */
+  std::pair<float, float> getPos() const override;
+
+  /**
+   * Set position
+   * @param x New X coordinate
+   * @param y New Y coordinate
+   */
+  void setPos(float x, float y) override;
+
+  /**
+   * Handle collision with another object
+   * @param other The other collideable object
+   * @param normalX X component of collision normal
+   * @param normalY Y component of collision normal
+   * @param penetration Overlap amount
+   */
+  void onCollision(Collideable *other, float normalX, float normalY,
+                   float penetration) override;
+
+  /**
+   * Check if player is static (always false for player)
+   * @return false - player is always dynamic
+   */
+  bool isStatic() const override { return false; }
+
+  /**
+   * Get object type for collision handling
+   * @return ObjectType::PLAYER
+   */
+  ObjectType getType() const override { return ObjectType::PLAYER; }
 };
 
 #endif
