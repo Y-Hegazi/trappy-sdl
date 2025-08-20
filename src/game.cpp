@@ -157,29 +157,13 @@ void Game::updatePlayerPos(float dt) {
     vel_y += 350.f; // Extra downward speed for quick descent (px/s)
   }
 
-  // Set movement state based on input activity
-  if (float(vel_x + vel_y) == 0.f)
-    player->setState(MovementState::IDLE);
-
-  // Side-aware collision detection system
-  // Projects movement to distinguish landing vs side-hits
-  SDL_Rect temp;
-  temp.x = static_cast<int>(lround(player->getRect().x));
-  temp.y = static_cast<int>(lround(player->getRect().y));
-  temp.w = static_cast<int>(lround(player->getRect().w));
-  temp.h = static_cast<int>(lround(player->getRect().h));
-
-  // // Simple collision check (will be enhanced with side-aware logic)
-  // if (SDL_HasIntersection(&temp, &floor) && vel_y > 0) {
-  //   player->stopFalling();     // Set vertical velocity to 0
-  //   player->setGrounded(true); // Mark player as on ground
-  //   player->resetJump();
-  // } else
-  //   player->setGrounded(false); // Reset ground state if not on floor
+  // Collision detection
   std::vector<Collideable *> colliders = {platform, platform2};
   CollisionSystem::resolveCollisions(player.get(), colliders);
 
-  // Apply movement and handle collisions
+  player->setLastDirection(
+      vel_x > 0 ? 1 : (vel_x < 0 ? -1 : player->getLastDirection()));
+  // Apply movement
   player->update(dt, vel_x, vel_y, dash);
 }
 /**
@@ -207,13 +191,13 @@ void Game::run() {
   // Create player at starting position with texture
   auto playerTexture =
       std::make_shared<Texture>(renderer.get(), playerTexturePath);
-  playerInit({100, 100, 32, 48}, playerTexture);
+  playerInit({100, 100, 32 * 2, 48 * 2}, playerTexture);
 
-  // Configure sprite rendering (temporary setup)
+  // Configure sprite rendering and animation
   auto sprite = player->getSprite();
   sprite->setDestRect(player->getRect());
-  sprite->setSrcRect({32, 48, 32, 48});
-  player->render(renderer.get());
+  // Set initial animation frame for IDLE state
+  player->animationHandle();
 
   // Main game loop - continues until user quits
   while (isRunning) {
@@ -233,22 +217,21 @@ void Game::run() {
 
     // Draw player sprite
     if (player) {
-      player->render(renderer.get());
+      player->renderAnimation(renderer.get(), dt, true);
     }
 
     // Draw floor platforms
     SDL_SetRenderDrawColor(renderer.get(), 0, 0, 0, 255);
     SDL_RenderFillRect(renderer.get(), &floor);
-    player->render(renderer.get()); // Second render for layering
-    platform->getSprite()->setDestRect(platform->getCollisionBounds());
-    platform->getSprite()->setSrcRect({0, 0, 500, 500});
-    platform->getSprite()->render(renderer.get());
+
+    // Draw platform sprites
     platform->getSprite()->setDestRect(platform->getCollisionBounds());
     platform->getSprite()->setSrcRect({0, 0, 500, 500});
     platform->getSprite()->render(renderer.get());
     platform2->getSprite()->setDestRect(platform2->getCollisionBounds());
     platform2->getSprite()->setSrcRect({0, 0, 500, 500});
     platform2->getSprite()->render(renderer.get());
+
     // Present completed frame
     SDL_RenderPresent(renderer.get());
   }
