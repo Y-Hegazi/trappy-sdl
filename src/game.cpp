@@ -28,31 +28,82 @@ Game::Game(const char *name, const char *playerTexture, int windowWidth,
                  if (renderer)
                    SDL_DestroyRenderer(renderer);
                }),
-      playerTexturePath(playerTexture) {
+      playerTexturePath(playerTexture), targetWidth(windowWidth),
+      targetHeight(windowHeight) {
 
   // Create main game window (windowWidth x windowHeight, centered on screen)
-  window.reset(SDL_CreateWindow(name, SDL_WINDOWPOS_CENTERED,
-                                SDL_WINDOWPOS_CENTERED, windowWidth,
-                                windowHeight, windowFlags));
+  window.reset(SDL_CreateWindow(
+      name, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowWidth,
+      windowHeight, windowFlags | SDL_WINDOW_RESIZABLE));
   if (nullptr == window) {
     throw std::runtime_error("Window could not be created! Error: " +
                              std::string(SDL_GetError()));
   }
 
+  // Prefer nearest-neighbor scaling for crisp pixels (important for pixel art)
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0"); // "0" = nearest
+
   // Create hardware-accelerated renderer with VSync enabled
-  // ACCELERATED: Use GPU acceleration when available
-  // PRESENTVSYNC: Sync to monitor refresh rate for smooth animation
   renderer.reset(SDL_CreateRenderer(window.get(), -1, rendererFlags));
   if (nullptr == renderer) {
     throw std::runtime_error("Renderer could not be created! Error: " +
                              std::string(SDL_GetError()));
   }
 
+  // Enable integer scaling (if supported) to avoid subpixel scaling artifacts
+  // and keep pixel-art crisp when the window is resized.
+  SDL_RenderSetIntegerScale(renderer.get(), SDL_TRUE);
+
+  // Set logical size for scaling (this defines the virtual resolution)
+  SDL_RenderSetLogicalSize(renderer.get(), targetWidth, targetHeight);
+}
+
+void Game::init() {
   // Initialize high-resolution timer for precise delta time calculation
   perfFreq = SDL_GetPerformanceFrequency();
+
+  // Create player at starting position with texture
+  auto playerTexture =
+      std::make_shared<Texture>(renderer.get(), playerTexturePath);
+
+  player =
+      std::make_unique<RectPlayer>(SDL_FRect{80, 100, 48, 72}, playerTexture);
+
+  player->init();
+  /*Sudo
+   *
+   *
+   *
+   */
+  map = std::make_unique<Map>(90, 15, 32);
+
+  // Create standard platforms and load textures
+  auto tex = std::make_shared<Texture>(renderer.get(), "wooden.png");
   auto tex2 = std::make_shared<Texture>(renderer.get(), "Grass_01.png");
-  platform = new Platform({00, 250, 900, 50}, tex2);
-  platform2 = new Platform({150, 150, 150, 200}, tex2);
+  for (int x = 0; x < 90; x++) {
+    SDL_FRect platformRect = {
+        static_cast<float>(x * 32),  // x position (32 pixels per tile)
+        static_cast<float>(14 * 32), // y position
+        32.0f,                       // width
+        32.0f                        // height
+    };
+    map->setTile(x, 14, std::make_shared<Platform>(platformRect, tex));
+  }
+  for (int x = 5; x < 90; x++) {
+    SDL_FRect platformRect = {
+        static_cast<float>(x * 32),  // x position (32 pixels per tile)
+        static_cast<float>(10 * 32), // y position
+        32.0f,                       // width
+        32.0f                        // height
+    };
+    map->setTile(x, 10, std::make_shared<Platform>(platformRect, tex2));
+  }
+  /*
+  *
+  *
+  *
+  Sudo
+  */
 }
 /**
  * Handle SDL events - Process user input and system events
@@ -157,8 +208,44 @@ void Game::updatePlayerPos(float dt) {
     vel_y += 350.f; // Extra downward speed for quick descent (px/s)
   }
 
+  // Ground check - check if player is still touching ground by looking slightly
+  // below
+  if (player->grounded()) {
+    SDL_FRect playerBounds = player->getCollisionBounds();
+    SDL_FRect groundCheckBounds = {
+        playerBounds.x,
+        playerBounds.y + playerBounds.h, // Start just below player
+        playerBounds.w,
+        2.0f // Small height to check for ground
+    };
+
+    bool stillOnGround = false;
+
+    // Check against map tiles instead of hardcoded platforms
+    auto nearbyTiles = map->getTilesInRect(groundCheckBounds);
+    for (auto &tile : nearbyTiles) {
+      if (CollisionSystem::checkAABB(groundCheckBounds,
+                                     tile->getCollisionBounds())) {
+        stillOnGround = true;
+        break;
+      }
+    }
+
+    if (!stillOnGround) {
+      player->setGrounded(false);
+    }
+  }
+
   // Collision detection
-  std::vector<Collideable *> colliders = {platform, platform2};
+  std::vector<Collideable *> colliders;
+
+  // Get tiles near the player for efficient collision detection
+  SDL_FRect playerBounds = player->getCollisionBounds();
+  auto nearbyTiles = map->getTilesInRect(playerBounds);
+  for (auto &tile : nearbyTiles) {
+    colliders.push_back(tile.get());
+  }
+
   CollisionSystem::resolveCollisions(player.get(), colliders);
 
   player->setLastDirection(
@@ -188,14 +275,9 @@ void Game::run() {
   // Initialize high-resolution timing
   Uint64 t0 = SDL_GetPerformanceCounter();
 
-  // Create player at starting position with texture
-  auto playerTexture =
-      std::make_shared<Texture>(renderer.get(), playerTexturePath);
-  playerInit({100, 100, 32 * 2, 48 * 2}, playerTexture);
+  // Initialize game objects (platforms, etc.)
+  init();
 
-  // Configure sprite rendering and animation
-  auto sprite = player->getSprite();
-  sprite->setDestRect(player->getRect());
   // Set initial animation frame for IDLE state
   player->animationHandle();
 
@@ -215,47 +297,18 @@ void Game::run() {
     SDL_SetRenderDrawColor(renderer.get(), 255, 255, 255, 255);
     SDL_RenderClear(renderer.get());
 
+    // Draw map tiles (this replaces individual platform rendering)
+    map->render(renderer.get());
+
     // Draw player sprite
     if (player) {
       player->renderAnimation(renderer.get(), dt, true);
     }
-
-    // Draw floor platforms
-    SDL_SetRenderDrawColor(renderer.get(), 0, 0, 0, 255);
-    SDL_RenderFillRect(renderer.get(), &floor);
-
-    // Draw platform sprites
-    platform->getSprite()->setDestRect(platform->getCollisionBounds());
-    platform->getSprite()->setSrcRect({0, 0, 500, 500});
-    platform->getSprite()->render(renderer.get());
-    platform2->getSprite()->setDestRect(platform2->getCollisionBounds());
-    platform2->getSprite()->setSrcRect({0, 0, 500, 500});
-    platform2->getSprite()->render(renderer.get());
-
     // Present completed frame
     SDL_RenderPresent(renderer.get());
   }
 }
 
-/**
- * Initialize player object with position and texture
- * @param rect Initial position and size as SDL_Rect
- * @param texture Shared texture resource for rendering
- */
-void Game::playerInit(SDL_Rect rect, std::shared_ptr<Texture> texture) {
-  if (!texture)
-    throw std::invalid_argument("texture must not be null");
-
-  // Convert integer SDL_Rect to floating-point SDL_FRect for player system
-  SDL_FRect frect = {(float)rect.x, (float)rect.y, (float)rect.w,
-                     (float)rect.h};
-
-  // Create player object (exception-safe construction)
-  auto newPlayer = std::make_unique<RectPlayer>(frect, texture);
-
-  // Commit to game state
-  player = std::move(newPlayer);
-}
 /**
  * Game Destructor - Clean up all allocated resources
  *

@@ -14,7 +14,13 @@ RectPlayer::RectPlayer(SDL_FRect rect_in, std::shared_ptr<Texture> texture)
   if (!texture) {
     throw std::invalid_argument("Texture shared_ptr must not be null");
   }
-
+  this->texture = std::move(texture);
+}
+void RectPlayer::init() {
+  // Create player at starting position with texture
+  sprite = std::make_unique<Sprite>(texture.get());
+  sprite->setDestRect(
+      {pos_x, pos_y, static_cast<float>(rect.w), static_cast<float>(rect.h)});
   animations = {{MovementState::IDLE, {{32 * 0, 48 * 1, 32, 48}}},
                 {MovementState::MOVING,
                  {{32 * 1, 48 * 1, 32, 48},
@@ -23,10 +29,6 @@ RectPlayer::RectPlayer(SDL_FRect rect_in, std::shared_ptr<Texture> texture)
                   {32 * 4, 48 * 1, 32, 48}}},
                 {MovementState::JUMPING, {{32 * 9, 48 * 1, 32, 48}}},
                 {MovementState::CROUCHING, {{32 * 7, 48 * 1, 32, 48}}}};
-
-  sprite = std::make_unique<Sprite>(texture.get());
-  sprite->setDestRect(
-      {pos_x, pos_y, static_cast<float>(rect.w), static_cast<float>(rect.h)});
 }
 
 std::pair<float, float> RectPlayer::getSize() const { return {rect.w, rect.h}; }

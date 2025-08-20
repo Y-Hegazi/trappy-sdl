@@ -89,6 +89,7 @@ public:
                    float penetration) override;
   bool isStatic() const override;
   ObjectType getType() const override;
+  void init();
 
 private:
   std::unordered_map<MovementState, std::vector<SDL_Rect>> animations;

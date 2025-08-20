@@ -2,6 +2,7 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include "map.h"
 #include "platform.h"
 #include "player.h"
 #include <SDL2/SDL_image.h>
@@ -100,13 +101,14 @@ public:
   void handleEvents(SDL_Event &e);
 
   void playerInit(SDL_Rect rect, std::shared_ptr<Texture> texture);
+  void init();
 
 private:
   // === SDL Core Objects ===
   SubSystemWrapper sdlSubsystem;
   std::unique_ptr<SDL_Window, void (*)(SDL_Window *)> window;
-  std::unique_ptr<SDL_Renderer, void (*)(SDL_Renderer *)>
-      renderer; // Hardware-accelerated renderer with VSync
+  std::unique_ptr<SDL_Renderer, void (*)(SDL_Renderer *)> renderer;
+  std::unique_ptr<Map> map;
 
   // === Game Objects ===
 
@@ -119,6 +121,11 @@ private:
   Uint64 perfFreq; // SDL performance counter frequency (for delta time
                    // calculation)
   const char *playerTexturePath; // Path to player texture file
+
+  // === Scaling and Resolution ===
+  int targetWidth;  // Target logical resolution width
+  int targetHeight; // Target logical resolution height
+
   // === Game State ===
   bool isRunning = false; // Main game loop control flag
 
