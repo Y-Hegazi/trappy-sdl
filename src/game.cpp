@@ -67,43 +67,13 @@ void Game::init() {
       std::make_shared<Texture>(renderer.get(), playerTexturePath);
 
   player =
-      std::make_unique<RectPlayer>(SDL_FRect{80, 100, 48, 72}, playerTexture);
+      std::make_unique<RectPlayer>(SDL_FRect{80, 100, 32, 48}, playerTexture);
 
   player->init();
-  /*Sudo
-   *
-   *
-   *
-   */
-  map = std::make_unique<Map>(90, 15, 32);
 
-  // Create standard platforms and load textures
-  auto tex = std::make_shared<Texture>(renderer.get(), "wooden.png");
-  auto tex2 = std::make_shared<Texture>(renderer.get(), "Grass_01.png");
-  for (int x = 0; x < 90; x++) {
-    SDL_FRect platformRect = {
-        static_cast<float>(x * 32),  // x position (32 pixels per tile)
-        static_cast<float>(14 * 32), // y position
-        32.0f,                       // width
-        32.0f                        // height
-    };
-    map->setTile(x, 14, std::make_shared<Platform>(platformRect, tex));
-  }
-  for (int x = 5; x < 90; x++) {
-    SDL_FRect platformRect = {
-        static_cast<float>(x * 32),  // x position (32 pixels per tile)
-        static_cast<float>(10 * 32), // y position
-        32.0f,                       // width
-        32.0f                        // height
-    };
-    map->setTile(x, 10, std::make_shared<Platform>(platformRect, tex2));
-  }
-  /*
-  *
-  *
-  *
-  Sudo
-  */
+  map = std::make_unique<Map>(90, 15, 32, 16, "map.tmx");
+
+  map->init(renderer.get());
 }
 /**
  * Handle SDL events - Process user input and system events

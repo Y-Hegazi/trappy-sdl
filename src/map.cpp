@@ -1,29 +1,66 @@
 #include "../include/map.h"
 #include <algorithm>
+#include <cmath>
+#include <iostream>
 
-Map::Map(int width, int height, int tileSize)
-    : width(width), height(height), tileSize(tileSize) {
+Map::Map(int width, int height, int tileSizeW, int tileSizeH,
+         const std::string &tmxFilePath)
+    : width(width), height(height), tileSizeW(tileSizeW), tileSizeH(tileSizeH),
+      tmxParser(tmxFilePath) {
   tiles.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
 }
 
 Map::~Map() = default;
 
-// void Map::init(){
-// for (int x = 0; x < 90; x++) {
-//     SDL_FRect platformRect = {
-//         static_cast<float>(x * 32),  // x position (32 pixels per tile)
-//         static_cast<float>(14 * 32), // y position
-//         32.0f,                       // width
-//         32.0f                        // height
-//     };
-//     std::make_shared<Texture>
-//     setTile(x, 14, std::make_shared<Platform>(platformRect, tex2));
-//   }
-// }
+void Map::init(SDL_Renderer *renderer) {
+  try {
+    tmxParser.loadFile();
+  } catch (const std::exception &e) {
+    std::cerr << "Error loading TMX file: " << e.what() << std::endl;
+  }
+  TMXParser::MapInfo mapInfo = tmxParser.getMapInfo();
+  auto tilesetInfo = tmxParser.getTilesetInfo();
+  auto layersInfo = tmxParser.getLayersInfo();
+
+  width = mapInfo.mapWidth;
+  height = mapInfo.mapHeight;
+  tileSizeW = mapInfo.tileWidth;
+  tileSizeH = mapInfo.tileHeight;
+  tiles.assign(static_cast<size_t>(width) * static_cast<size_t>(height),
+               nullptr);
+  const int cols = tilesetInfo[0].columns;
+  const int srcTilesWidth = tilesetInfo[0].tilesWidth;
+  const int srcTilesHeight = tilesetInfo[0].tilesHeight;
+  assets =
+      std::make_shared<Texture>(renderer, tilesetInfo[0].imagePath.c_str());
+
+  for (size_t i = 0; i < layersInfo[0].data.size(); ++i) {
+    int gid = layersInfo[0].data[i];
+    if (gid) {
+      int tx = static_cast<int>(i % static_cast<size_t>(width));
+      int ty = static_cast<int>(i / static_cast<size_t>(width));
+      float x_ = static_cast<float>(tx * tileSizeW);
+      float y_ = static_cast<float>(ty * tileSizeH);
+      float w_ = static_cast<float>(tileSizeW);
+      float h_ = static_cast<float>(tileSizeH);
+      SDL_FRect destRect = {x_, y_, w_, h_};
+      auto tile = std::make_shared<Platform>(destRect, assets);
+      int local = gid - tilesetInfo[0].firstGid;
+      int _x = (local % cols) * srcTilesWidth;
+      int _y = (local / cols) * srcTilesHeight;
+      int _w = srcTilesWidth;
+      int _h = srcTilesHeight;
+      SDL_Rect srcRect = {_x, _y, _w, _h};
+      tile->getSprite()->setSrcRect(srcRect);
+      tile->getSprite()->setDestRect(destRect);
+      setTile(tx, ty, tile);
+    }
+  }
+}
 
 int Map::getWidth() const { return width; }
 int Map::getHeight() const { return height; }
-int Map::getTileSize() const { return tileSize; }
+int Map::getTileSize() const { return tileSizeW; }
 
 void Map::setTile(int x, int y, std::shared_ptr<Platform> tile) {
   if (!inBounds(x, y))
@@ -53,14 +90,14 @@ bool Map::inBounds(int x, int y) const {
 }
 
 void Map::worldToTile(int wx, int wy, int &tx, int &ty) const {
-  tx = wx / tileSize;
-  ty = wy / tileSize;
+  tx = wx / tileSizeW;
+  ty = wy / tileSizeH;
 }
 
 SDL_FRect Map::tileToWorldRect(int tx, int ty) const {
-  return SDL_FRect{static_cast<float>(tx * tileSize),
-                   static_cast<float>(ty * tileSize),
-                   static_cast<float>(tileSize), static_cast<float>(tileSize)};
+  return SDL_FRect{
+      static_cast<float>(tx * tileSizeW), static_cast<float>(ty * tileSizeH),
+      static_cast<float>(tileSizeW), static_cast<float>(tileSizeH)};
 }
 
 std::vector<std::shared_ptr<Platform>>
@@ -108,7 +145,7 @@ void Map::render(SDL_Renderer *renderer) const {
       if (!tile)
         continue;
       // Ensure sprite destination matches the tile's world rect
-      tile->getSprite()->setSrcRect({0, 0, 500, 500});
+      // tile->getSprite()->setSrcRect({0, 0, 500, 500});
       tile->getSprite()->setDestRect(tile->getCollisionBounds());
       tile->getSprite()->render(renderer);
     }
