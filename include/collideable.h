@@ -1,6 +1,7 @@
 #ifndef COLLIDEABLE_H
 #define COLLIDEABLE_H
 
+#include "config.h"
 #include <SDL2/SDL.h>
 #include <utility>
 

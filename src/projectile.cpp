@@ -1,4 +1,6 @@
 #include "../include/projectile.h"
+#include "../include/player.h"
+#include <cmath>
 
 Projectile::Projectile(const SDL_FRect &b, ProjectileType type,
                        std::shared_ptr<Texture> tex)
@@ -6,6 +8,11 @@ Projectile::Projectile(const SDL_FRect &b, ProjectileType type,
   // Create sprite if texture is provided
   if (texture) {
     sprite = std::make_unique<Sprite>(texture.get());
+  }
+
+  // Initialize base position for coin bobbing
+  if (projectileType == ProjectileType::COIN) {
+    baseY = bounds.y;
   }
 }
 
@@ -20,19 +27,48 @@ void Projectile::setPos(float x, float y) {
   bounds.y = y;
 }
 
-void Projectile::update(float dt) {
-  // Apply gravity to arrows/bullets (not coins)
-  if (projectileType != ProjectileType::COIN) {
-    vel_y += gravity * dt;
+void Projectile::coinBounce(float dt) {
+  // No longer used - coins use visual bobbing instead
+}
+
+void Projectile::update(float dt, SDL_Rect &worldBounds, bool bounceCoins) {
+  // Handle coin bobbing animation
+  if (projectileType == ProjectileType::COIN) {
+    bobTimer += dt;
+    // Calculate bobbing offset using sine wave
+    float bobOffset = sin(bobTimer * bobFrequency * 2.0f * M_PI) * bobAmplitude;
+    // Update visual position (don't change actual bounds for collision)
+    if (sprite) {
+      SDL_FRect renderBounds = bounds;
+      renderBounds.y = baseY + bobOffset;
+      sprite->setDestRect(renderBounds);
+    }
   }
 
-  // Update position
-  bounds.x += vel_x * dt;
-  bounds.y += vel_y * dt;
+  // Update position (only for non-coins, since coins use visual bobbing)
+  if (projectileType != ProjectileType::COIN) {
+    bounds.x += vel_x * dt;
+    bounds.y += vel_y * dt;
+  }
 
   // Update sprite animation if it exists
-  if (sprite) {
+  if (sprite && projectileType != ProjectileType::COIN) {
     sprite->update(dt);
+  }
+
+  // Remove if out of world bounds (except for arrows which respawn)
+  if (bounds.x + bounds.w < worldBounds.x ||
+      bounds.x > worldBounds.x + worldBounds.w ||
+      bounds.y + bounds.h < worldBounds.y ||
+      bounds.y > worldBounds.y + worldBounds.h) {
+
+    if (projectileType == ProjectileType::ARROW) {
+      // Respawn arrows at original position
+      resetToOriginalPosition();
+    } else {
+      // Remove other projectiles
+      markForRemoval();
+    }
   }
 }
 
@@ -42,7 +78,14 @@ void Projectile::render(SDL_Renderer *renderer) const {
     SDL_Rect renderRect = {
         static_cast<int>(bounds.x), static_cast<int>(bounds.y),
         static_cast<int>(bounds.w), static_cast<int>(bounds.h)};
+    sprite->setDestRect(bounds);
     sprite->render(renderer, SDL_FLIP_NONE);
+  }
+}
+
+void Projectile::setSpriteSrcRect(const SDL_Rect &srcRect) {
+  if (sprite) {
+    sprite->setSrcRect(srcRect);
   }
 }
 
@@ -55,24 +98,20 @@ void Projectile::onCollision(Collideable *other, float normalX, float normalY,
       // Coin collected - mark for removal
       markForRemoval();
       // Add score
-    } else {
-      // Arrow/bullet hits player - damage and remove
-      markForRemoval();
-      // 1- Player damage 2- make a player respawn
+    } else if (projectileType == ProjectileType::ARROW) {
+      // Arrow hits player - kill player and respawn arrow
+      RectPlayer *player = static_cast<RectPlayer *>(other);
+      player->setDead(true);
+      // resetToOriginalPosition(); // Respawn instead of removing
     }
   } else if (otherType == ObjectType::STATIC_OBJECT) {
     // Projectile hits wall/platform
-    if (projectileType == ProjectileType::COIN) {
-      // Coins bounce
-      if (normalX != 0)
-        vel_x = -vel_x * 0.7f; // Bounce horizontally with damping
-      if (normalY != 0)
-        vel_y = -vel_y * 0.7f; // Bounce vertically with damping
+    if (projectileType == ProjectileType::ARROW) {
+      // Arrows respawn when hitting walls
+      resetToOriginalPosition();
     } else {
-      // Arrows/bullets stick to walls
-      vel_x = 0;
-      vel_y = 0;
-      // Could mark for removal after some time
+      // Other projectiles disappear on impact
+      markForRemoval();
     }
   }
 }

@@ -2,6 +2,7 @@
 #define COLLISION_SYSTEM_H
 
 #include "collideable.h"
+#include "config.h"
 #include <vector>
 /**
  * Simple collision system for a trap-land platformer game.
@@ -36,6 +37,18 @@ public:
    */
   static void handleCollision(Collideable *a, Collideable *b);
 
+  /**
+   * Helper to compute collision normal and penetration
+   * @param a First bounding box
+   * @param b Second bounding box
+   * @param normalX Output collision normal X component
+   * @param normalY Output collision normal Y component
+   * @param penetration Output penetration depth
+   */
+  static void computeCollisionInfo(const SDL_FRect &a, const SDL_FRect &b,
+                                   float &normalX, float &normalY,
+                                   float &penetration);
+
 private:
   // Specific collision handlers
   static void handlePlayerVsStatic(Collideable *player, Collideable *staticObj);
@@ -43,11 +56,6 @@ private:
                                        Collideable *projectile);
   static void handleProjectileVsStatic(Collideable *projectile,
                                        Collideable *staticObj);
-
-  // Helper to compute collision normal and penetration
-  static void computeCollisionInfo(const SDL_FRect &a, const SDL_FRect &b,
-                                   float &normalX, float &normalY,
-                                   float &penetration);
 };
 
 #endif // COLLISION_SYSTEM_H

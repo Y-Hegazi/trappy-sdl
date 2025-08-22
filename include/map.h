@@ -1,11 +1,15 @@
 #pragma once
 
 #include "collideable.h"
+#include "config.h"
+#include "disappearing_platform.h"
 #include "layer.h"
 #include "platform.h"
+#include "projectile.h"
 #include "sprite.h"
 #include "texture.h"
 #include "tmx_parser.h"
+#include "trap_platform.h"
 #include <SDL2/SDL.h>
 #include <memory>
 #include <sstream>
@@ -31,8 +35,8 @@ public:
 
   // Layer management
   int getLayerCount() const;
-  Layer* getLayer(int index) const;
-  Layer* getLayer(const std::string &name) const;
+  Layer *getLayer(int index) const;
+  Layer *getLayer(const std::string &name) const;
   int addLayer(const std::string &name);
   void removeLayer(int index);
   void setLayerVisible(int index, bool visible);
@@ -53,10 +57,25 @@ public:
   std::vector<std::shared_ptr<Platform>>
   getTilesInRect(const SDL_FRect &rect) const;
   std::vector<std::shared_ptr<Platform>> getAllTiles() const;
-  
+
   // rendering
-  void render(SDL_Renderer *renderer) const;
+  void render(SDL_Renderer *renderer, float dt) const;
   void renderLayer(SDL_Renderer *renderer, int index) const;
+
+  // projectile management
+  void updateProjectiles(float dt);
+  void removeDeadProjectiles();
+  std::vector<std::shared_ptr<Projectile>> &getProjectiles() {
+    return projectiles;
+  }
+
+  // special platform management
+  void updateDisappearingPlatforms(float dt);
+  void removeDisappearedPlatforms();
+
+  // layer-based status effects
+  bool isPlayerOnSlowLayer(const SDL_FRect &playerBounds) const;
+  bool isPlayerOnTrapLayer(const SDL_FRect &playerBounds) const;
 
 private:
   TMXParser tmxParser;
@@ -64,14 +83,19 @@ private:
   int height;
   int tileSizeW;
   int tileSizeH;
-  
-  // Layer system
+
+  // Layer system, includes traps
   std::vector<std::unique_ptr<Layer>> layers;
-  
+
   // Tileset textures (shared across layers)
   std::vector<std::shared_ptr<Texture>> tilesetTextures;
-  
-  // Legacy support
-  std::vector<std::shared_ptr<Platform>> tiles; // Deprecated, use layers instead
+
+  std::vector<std::shared_ptr<Platform>>
+      tiles; // Deprecated, use layers instead but it causes errors when removed
+             // so...
+
+  std::vector<std::shared_ptr<Projectile>> projectiles;
+  std::vector<std::shared_ptr<DisappearingPlatform>> disappearingPlatforms;
+
   std::shared_ptr<Texture> assets; // Optional texture for rendering
 };

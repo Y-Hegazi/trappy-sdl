@@ -12,6 +12,7 @@
  * - Sub-pixel positioning with SDL_FRect
  */
 
+#include "config.h"
 #include "texture.h"
 #include <vector>
 

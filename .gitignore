@@ -25,10 +25,17 @@ Makefile
 *.iml
 
 # Keep media (png) in repo
-!*.png
+
 
 # Formatting file
 *.clang-format
 
 # garbage files
 garbage
+garbage.txt
+
+# TODO and planning files
+TODO.txt
+*.todo
+IMPROVEMENTS.txt
+ROADMAP.txt

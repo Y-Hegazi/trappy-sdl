@@ -1,5 +1,6 @@
 #include "../include/game.h"
 #include "../include/collision_system.h"
+#include "../include/config.h"
 #include "../include/platform.h"
 #include <SDL2/SDL_image.h>
 #include <iostream>
@@ -41,7 +42,8 @@ Game::Game(const char *name, const char *playerTexture, int windowWidth,
   }
 
   // Prefer nearest-neighbor scaling for crisp pixels (important for pixel art)
-  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0"); // "0" = nearest
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,
+              RENDER_SCALE_QUALITY); // "0" = nearest
 
   // Create hardware-accelerated renderer with VSync enabled
   renderer.reset(SDL_CreateRenderer(window.get(), -1, rendererFlags));
@@ -50,9 +52,8 @@ Game::Game(const char *name, const char *playerTexture, int windowWidth,
                              std::string(SDL_GetError()));
   }
 
-  // Enable integer scaling (if supported) to avoid subpixel scaling artifacts
-  // and keep pixel-art crisp when the window is resized.
-  SDL_RenderSetIntegerScale(renderer.get(), SDL_TRUE);
+  // Disable integer scaling so content scales continuously with window size
+  SDL_RenderSetIntegerScale(renderer.get(), SDL_FALSE);
 
   // Set logical size for scaling (this defines the virtual resolution)
   SDL_RenderSetLogicalSize(renderer.get(), targetWidth, targetHeight);
@@ -64,14 +65,17 @@ void Game::init() {
 
   // Create player at starting position with texture
   auto playerTexture =
-      std::make_shared<Texture>(renderer.get(), playerTexturePath);
+      std::make_shared<Texture>(renderer.get(), PLAYER_TEXTURE_PATH);
 
-  player =
-      std::make_unique<RectPlayer>(SDL_FRect{80, 100, 32, 48}, playerTexture);
+  player = std::make_unique<RectPlayer>(
+      SDL_FRect{PLAYER_START_X, PLAYER_START_Y, PLAYER_WIDTH, PLAYER_HEIGHT},
+      playerTexture);
 
   player->init();
 
-  map = std::make_unique<Map>(90, 15, 32, 16, "map.tmx");
+  map = std::make_unique<Map>(DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT,
+                              DEFAULT_TILE_WIDTH, DEFAULT_TILE_HEIGHT,
+                              MAP_FILE_PATH);
 
   map->init(renderer.get());
 }
@@ -90,8 +94,17 @@ void Game::init() {
  */
 void Game::handleEvents(SDL_Event &e) {
   while (SDL_PollEvent(&e)) {
-    if (e.type == SDL_QUIT)
+    if (e.type == SDL_QUIT) {
       isRunning = false;
+    } else if (e.type == SDL_WINDOWEVENT &&
+               e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+      int w = e.window.data1;
+      int h = e.window.data2;
+      // Stretch to fill entire window (no letterboxing)
+      SDL_RenderSetViewport(renderer.get(), nullptr);
+      SDL_RenderSetScale(renderer.get(), static_cast<float>(w) / targetWidth,
+                         static_cast<float>(h) / targetHeight);
+    }
   }
 }
 
@@ -123,60 +136,22 @@ void Game::updatePlayerPos(float dt) {
     return;
 
   const Uint8 *keyboardState = SDL_GetKeyboardState(NULL);
-  // Crouch handling (left control)
-  bool crouch = false;
-  if (keyboardState[SDL_SCANCODE_LCTRL] && player->grounded()) {
-    crouch = true;
-    player->setCrouch(true);
-  } else {
-    player->setCrouch(false);
-  }
-  bool dash = false;
-  if (keyboardState[SDL_SCANCODE_LSHIFT]) {
-    dash = true;
-  }
 
-  // Initialize velocities for this frame
-  float vel_x = 0;                    // Horizontal velocity (reset each frame)
-  float vel_y = player->getGravity(); // Start with gravity as downward velocity
+  // Read input states
+  bool moveLeft =
+      keyboardState[KEY_MOVE_LEFT] || keyboardState[KEY_MOVE_LEFT_ALT];
+  bool moveRight =
+      keyboardState[KEY_MOVE_RIGHT] || keyboardState[KEY_MOVE_RIGHT_ALT];
+  bool jump = keyboardState[KEY_JUMP] || keyboardState[KEY_JUMP_ALT1] ||
+              keyboardState[KEY_JUMP_ALT2];
+  bool fastFall =
+      (keyboardState[KEY_FAST_FALL] || keyboardState[KEY_FAST_FALL_ALT]) &&
+      !player->grounded();
+  bool dash = keyboardState[KEY_DASH];
+  bool crouch = keyboardState[KEY_CROUCH] && player->grounded();
 
-  // Horizontal movement input (A/D or Arrow Keys)
-  if (keyboardState[SDL_SCANCODE_A] || keyboardState[SDL_SCANCODE_LEFT]) {
-    vel_x -= 180.f; // Move left at 180 pixels/second (slightly faster)
-  }
-  if (keyboardState[SDL_SCANCODE_D] || keyboardState[SDL_SCANCODE_RIGHT]) {
-    vel_x += 180.f; // Move right at 180 pixels/second (slightly faster)
-  }
-
-  // Vertical movement: Jump system with variable height
-  if (keyboardState[SDL_SCANCODE_UP] || keyboardState[SDL_SCANCODE_W] ||
-      keyboardState[SDL_SCANCODE_SPACE]) {
-    if (player->grounded()) {
-      // Initial jump: strong upward impulse
-      player->setJumping(true);
-      player->setDashing(false);
-      player->setCrouch(false);
-      player->setGrounded(false);
-      vel_y -= 1200.f; // Strong initial jump velocity (px/s)
-    } else if (player->getJumping() &&
-               player->getJumpDurationTimer() < player->getJumpDuration()) {
-      // Variable height: extend jump while button held
-      if (player->getJumpDurationTimer() < player->getJumpDuration() / 2.0) {
-        vel_y -= 1200.f; // Full power during first half
-      } else
-        vel_y -= 800.f; // Reduced power during second half
-      player->setJumping(true);
-      player->setJumpDurationTimer(player->getJumpDurationTimer() +
-                                   dt * 1000.f);
-    }
-  } else {
-    player->resetJump(); // Stop jump when button released
-  }
-  // Fast-fall: increase downward velocity when falling
-  if (keyboardState[SDL_SCANCODE_S] ||
-      keyboardState[SDL_SCANCODE_DOWN] && !(player->grounded())) {
-    vel_y += 350.f; // Extra downward speed for quick descent (px/s)
-  }
+  // Handle movement through the new system
+  player->handleMovement(dt, moveLeft, moveRight, jump, fastFall, dash, crouch);
 
   // Ground check - check if player is still touching ground by looking slightly
   // below
@@ -186,7 +161,7 @@ void Game::updatePlayerPos(float dt) {
         playerBounds.x,
         playerBounds.y + playerBounds.h, // Start just below player
         playerBounds.w,
-        2.0f // Small height to check for ground
+        GROUND_CHECK_HEIGHT // Small height to check for ground
     };
 
     bool stillOnGround = false;
@@ -218,10 +193,8 @@ void Game::updatePlayerPos(float dt) {
 
   CollisionSystem::resolveCollisions(player.get(), colliders);
 
-  player->setLastDirection(
-      vel_x > 0 ? 1 : (vel_x < 0 ? -1 : player->getLastDirection()));
-  // Apply movement
-  player->update(dt, vel_x, vel_y, dash);
+  // Apply movement update
+  player->update(dt);
 }
 /**
  * Main game loop - Core execution and rendering
@@ -262,13 +235,62 @@ void Game::run() {
     handleEvents(e);     // Handle quit events
     updatePlayerPos(dt); // Handle movement input and physics
 
+    // Update projectiles
+    map->updateProjectiles(dt);
+
+    // Update disappearing platforms
+    map->updateDisappearingPlatforms(dt);
+
+    // Apply layer-based status effects to player
+    if (player) {
+      // Check if player is on slow layer
+      bool onSlowLayer = map->isPlayerOnSlowLayer(player->getCollisionBounds());
+      player->setSlowed(onSlowLayer);
+
+      // Check if player died from trap layer
+      if (map->isPlayerOnTrapLayer(player->getCollisionBounds())) {
+        player->setDead(true);
+      }
+
+      // Handle player death (simple respawn for now)
+      if (player->getDead()) {
+        // Reset player position to start
+        player->setPos(PLAYER_START_X, PLAYER_START_Y);
+        player->setDead(false);
+      }
+    }
+
+    // Check collisions between player and projectiles
+    if (player) {
+      for (auto &projectile : map->getProjectiles()) {
+        if (CollisionSystem::checkAABB(player->getCollisionBounds(),
+                                       projectile->getCollisionBounds())) {
+          // Handle collision directly instead of using private method
+          float normalX, normalY, penetration;
+          CollisionSystem::computeCollisionInfo(
+              player->getCollisionBounds(), projectile->getCollisionBounds(),
+              normalX, normalY, penetration);
+          // Call collision callbacks (projectile handles collection/damage
+          // logic)
+          player->onCollision(projectile.get(), normalX, normalY, penetration);
+          projectile->onCollision(player.get(), -normalX, -normalY,
+                                  penetration);
+        }
+      }
+    }
+
+    // Remove dead projectiles and disappeared platforms
+    map->removeDeadProjectiles();
+    map->removeDisappearedPlatforms();
+
     // === RENDERING: Draw frame to screen ===
     // Clear screen to white background
-    SDL_SetRenderDrawColor(renderer.get(), 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer.get(), ALPHA_OPAQUE, ALPHA_OPAQUE,
+                           ALPHA_OPAQUE, ALPHA_OPAQUE);
     SDL_RenderClear(renderer.get());
 
     // Draw map tiles (this replaces individual platform rendering)
-    map->render(renderer.get());
+    map->render(renderer.get(), dt);
 
     // Draw player sprite
     if (player) {

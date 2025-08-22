@@ -2,6 +2,7 @@
 #define PLAYER_H
 
 #include "collideable.h"
+#include "config.h"
 #include "sprite.h"
 #include "texture.h"
 #include <SDL2/SDL.h>
@@ -35,7 +36,9 @@ public:
   getAnimationMap() const;
 
   // Core functionality
-  void update(float dt, float vel_x, float vel_y, bool dash);
+  void update(float dt);
+  void handleMovement(float dt, bool moveLeft, bool moveRight, bool jump,
+                      bool fastFall, bool dash, bool crouch);
   void render(SDL_Renderer *renderer) const;
 
   // Physics
@@ -55,22 +58,13 @@ public:
   float getJumpDurationTimer() const;
 
   // Dash system
-  void setDashParams(float speed, float duration, float cooldown);
+  void initializeDashParams();
   bool canDash() const;
   bool isDashing() const;
-  void setDashing(bool dashing);
-  void startDash(int direction);
-  void resetDash();
-  void setDashCooldown(float ms);
-  float getDashCooldown() const;
-  void setDashCooldownTimer(float ms);
-  float getDashCooldownTimer() const;
-  float getDashDuration() const;
-  void setDashDuration(float duration);
-  void setDashDurationTimer(float ms);
-  float getDashDurationTimer() const;
-  float getDashSpeed() const;
-  void setDashSpeed(float speed);
+  void startDash(Direction direction);
+  void updateDash(float dt);
+  void stopDash();
+  void resetDashCooldown();
 
   // Crouch system
   bool isCrouching() const;
@@ -111,15 +105,29 @@ private:
   int lastDirection;
 
   bool crouching;
+
   bool dashing;
   float dashSpeed;
   float dashDuration;
   float dashTimer;
   float dashCooldown;
   float dashCooldownTimer;
-  int dashDir;
+  Direction dashDirection;
+
+  // Status effects
+  bool isSlowed = false;
+  bool isDead = false;
 
   void stateHandle();
+
+public:
+  // Status effect methods
+  void setSlowed(bool slowed) { isSlowed = slowed; }
+  bool getSlowed() const { return isSlowed; }
+  void setDead(bool dead) { isDead = dead; }
+  bool getDead() const { return isDead; }
+  float getEffectiveSpeed() const;
+  float getEffectiveJumpForce() const;
 };
 
 #endif
