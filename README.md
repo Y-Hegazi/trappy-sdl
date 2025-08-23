@@ -86,7 +86,7 @@ vcpkg install sdl2 sdl2-image sdl2-mixer sdl2-ttf tinyxml2 --triplet x64-windows
 
 #### Using CMake (Recommended)
 ```bash
-cd sdl
+cd trappy-sdl
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
@@ -94,7 +94,7 @@ cmake --build . --config Release
 
 On Windows with vcpkg:
 ```cmd
-cd sdl
+cd trappy-sdl
 mkdir build && cd build
 cmake .. -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows
 cmake --build . --config Release
@@ -102,7 +102,7 @@ cmake --build . --config Release
 
 #### Legacy build (Linux only)
 ```bash
-cd sdl/src
+cd trappy-sdl/src
 g++ -std=c++17 -I../include *.cpp -o game -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -ltinyxml2
 ```
 
