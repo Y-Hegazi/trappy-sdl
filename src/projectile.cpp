@@ -97,12 +97,13 @@ void Projectile::onCollision(Collideable *other, float normalX, float normalY,
     if (projectileType == ProjectileType::COIN) {
       // Coin collected - mark for removal
       markForRemoval();
+      // put sound here
       // Add score
     } else if (projectileType == ProjectileType::ARROW) {
       // Arrow hits player - kill player and respawn arrow
       RectPlayer *player = static_cast<RectPlayer *>(other);
       player->setDead(true);
-      // resetToOriginalPosition(); // Respawn instead of removing
+      // put sound here
     }
   } else if (otherType == ObjectType::STATIC_OBJECT) {
     // Projectile hits wall/platform

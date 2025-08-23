@@ -182,6 +182,7 @@ void Game::updatePlayerPos(float dt) {
   }
 
   // Collision detection
+  // Not Owning
   std::vector<Collideable *> colliders;
 
   // Get tiles near the player for efficient collision detection

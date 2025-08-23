@@ -42,14 +42,6 @@ public:
    */
   SDL_Texture *get() const;
 
-  /**
-   * Transfer ownership of SDL_Texture to caller.
-   * Texture object becomes invalid after this call.
-   * @return Raw SDL_Texture pointer that caller must destroy with
-   * SDL_DestroyTexture
-   */
-  SDL_Texture *release() noexcept;
-
   // Rule of 5: destructor, copy/move constructors and assignments
   ~Texture() = default;
   Texture(const Texture &) =

@@ -121,4 +121,8 @@
 #define BULLET_VEL_Y 10.0f
 #define COINS_BOUNCING_DEFAULT true
 
+// === AUDIO SETTINGS ===
+#define SOUND_EFFECT_VOLUME 128 // Max 128
+#define MUSIC_VOLUME 128
+
 #endif // CONFIG_H

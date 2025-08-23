@@ -4,9 +4,11 @@
 
 #include "config.h"
 #include "map.h"
+
 #include "platform.h"
 #include "player.h"
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_mixer.h>
 #include <memory>
 /**
  * SubSystemWrapper - RAII wrapper for SDL subsystem initialization and cleanup
@@ -28,7 +30,8 @@ public:
    * @throws std::runtime_error if SDL initialization fails
    */
   SubSystemWrapper(Uint32 SDL_flags = SDL_INIT_VIDEO,
-                   Uint32 IMG_flags = IMG_INIT_PNG) {
+                   Uint32 IMG_flags = IMG_INIT_PNG,
+                   Uint32 MIX_flags = SDL_INIT_AUDIO) {
     if (SDL_Init(SDL_flags) < 0) {
       throw std::runtime_error("Failed to initialize SDL: " +
                                std::string(SDL_GetError()));
@@ -38,6 +41,11 @@ public:
       throw std::runtime_error("Failed to initialize SDL_image: " +
                                std::string(IMG_GetError()));
     }
+
+    if (!(Mix_Init(MIX_flags) & MIX_flags)) {
+      throw std::runtime_error("Failed to initialize SDL_mixer: " +
+                               std::string(Mix_GetError()));
+    }
   }
 
   /**
@@ -46,6 +54,7 @@ public:
    */
   ~SubSystemWrapper() {
     IMG_Quit();
+    Mix_Quit();
     SDL_Quit();
   }
 
@@ -115,8 +124,6 @@ private:
 
   std::unique_ptr<RectPlayer> player =
       nullptr; // Smart pointer for automatic cleanup
-  Platform *platform;
-  Platform *platform2;
 
   // === Timing and Performance ===
   Uint64 perfFreq; // SDL performance counter frequency (for delta time
@@ -149,6 +156,16 @@ private:
    * Also handles collision detection with the floor
    */
   void updatePlayerPos(float dt);
+
+  /*
+   * Music handling methods
+   */
+
+  void loadBackgroundMusic(const char *file);
+  void playBackgroundMusic();
+  void stopBackgroundMusic();
+  void setBackgroundMusicVolume(int volume);
+  int getBackgroundMusicVolume() const;
 };
 
 #endif // GAME_H

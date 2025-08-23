@@ -42,5 +42,3 @@ Texture::Texture(SDL_Renderer *renderer, const char *filePath)
 }
 
 SDL_Texture *Texture::get() const { return texture.get(); }
-
-SDL_Texture *Texture::release() noexcept { return texture.release(); }
