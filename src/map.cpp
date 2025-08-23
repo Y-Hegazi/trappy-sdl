@@ -74,9 +74,28 @@ void Map::init(SDL_Renderer *renderer) {
     // handle trophies layer
     if (layer->getName() == COINS_LAYER_NAME) {
       auto preCoins = layer->getAllTiles();
+      totalCoins = preCoins.size(); // Track total number of coins
+      collectedCoins = 0;           // Reset collected count
+      originalCoinBounds.clear();   // Clear previous bounds
+
+      // Store template data from first coin for respawning
+      if (!preCoins.empty()) {
+        auto firstCoin = preCoins[0];
+        coinTexture = firstCoin->getTexture();
+        if (firstCoin->getSprite()) {
+          coinSrcRect = firstCoin->getSprite()->getSrcRect();
+        } else {
+          coinSrcRect = {0, 0, DEFAULT_TILE_WIDTH, DEFAULT_TILE_HEIGHT};
+        }
+      }
+
       for (auto pc : preCoins) {
         // Handle each coin tile
         SDL_FRect bounds = pc->getCollisionBounds();
+
+        // Store original bounds for respawning (position AND size)
+        originalCoinBounds.push_back(bounds);
+
         auto coin = std::make_shared<Projectile>(
             bounds, Projectile::ProjectileType::COIN, pc->getTexture());
         // Don't take ownership of the platform's sprite (it is owned by the
@@ -472,4 +491,50 @@ bool Map::isPlayerOnTrapLayer(const SDL_FRect &playerBounds) const {
     }
   }
   return false;
+}
+
+void Map::resetCoins() {
+  // Reset collected coin count
+  collectedCoins = 0;
+
+  // Remove all existing coin projectiles
+  auto it = std::remove_if(projectiles.begin(), projectiles.end(),
+                           [](const std::shared_ptr<Projectile> &proj) {
+                             return proj->getProjectileType() ==
+                                    Projectile::ProjectileType::COIN;
+                           });
+  projectiles.erase(it, projectiles.end());
+
+  // Recreate coins at original positions using stored template data
+  if (originalCoinBounds.size() != static_cast<size_t>(totalCoins)) {
+    std::cerr
+        << "Warning: Mismatch between totalCoins and originalCoinBounds size"
+        << std::endl;
+    return;
+  }
+
+  if (!coinTexture) {
+    std::cerr << "Warning: No coin texture stored for respawning" << std::endl;
+    return;
+  }
+
+  for (size_t i = 0; i < originalCoinBounds.size(); ++i) {
+    // Use the exact original bounds (position and size)
+    SDL_FRect bounds = originalCoinBounds[i];
+
+    auto coin = std::make_shared<Projectile>(
+        bounds, Projectile::ProjectileType::COIN, coinTexture);
+
+    // Set sprite properties using stored template data
+    auto spriteShared = std::make_shared<Sprite>(coinTexture.get());
+    spriteShared->setSrcRect(coinSrcRect);
+    spriteShared->setDestRect(bounds);
+    coin->setSprite(spriteShared);
+
+    // Set audio manager for coin sound
+    coin->setAudioManager(audioManager);
+
+    // Add coin back to projectiles
+    projectiles.push_back(coin);
+  }
 }

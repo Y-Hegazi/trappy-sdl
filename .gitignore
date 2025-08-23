@@ -1,6 +1,6 @@
 # Build artifacts
-/build/
-/bin/
+build/
+bin/
 *.o
 *.obj
 *.exe
@@ -8,11 +8,24 @@ game
 a.out
 *.out
 
-# CMake files
+# CMake generated files
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
+install_manifest.txt
+CPackConfig.cmake
+CPackSourceConfig.cmake
+
+# Generated Makefiles
 Makefile
+
+# CPack packages
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+*.dmg
+_CPack_Packages/
 
 # Editor / OS
 .vscode/
@@ -39,3 +52,5 @@ TODO.txt
 *.todo
 IMPROVEMENTS.txt
 ROADMAP.txt
+
+.gitignore

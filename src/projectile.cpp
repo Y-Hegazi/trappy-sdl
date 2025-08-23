@@ -100,13 +100,13 @@ void Projectile::onCollision(Collideable *other, float normalX, float normalY,
 
   if (otherType == ObjectType::PLAYER) {
     if (projectileType == ProjectileType::COIN) {
-      // Coin collected - mark for removal
+      // Coin collected - mark for removal (will be handled by map)
       markForRemoval();
       // play sound effect
       if (audioManager) {
         audioManager->playSound(PlayerSounds::COLLECT_COIN);
       }
-      // Add score
+      // Note: Coin counting is handled by the game/map level
     } else if (projectileType == ProjectileType::ARROW) {
       // Arrow hits player - kill player and respawn arrow
       RectPlayer *player = static_cast<RectPlayer *>(other);

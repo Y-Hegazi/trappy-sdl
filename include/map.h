@@ -78,6 +78,13 @@ public:
   bool isPlayerOnSlowLayer(const SDL_FRect &playerBounds) const;
   bool isPlayerOnTrapLayer(const SDL_FRect &playerBounds) const;
 
+  // coin management for win condition
+  int getTotalCoins() const { return totalCoins; }
+  int getCollectedCoins() const { return collectedCoins; }
+  bool areAllCoinsCollected() const { return collectedCoins >= totalCoins; }
+  void collectCoin() { collectedCoins++; }
+  void resetCoins();
+
   void setAudioManager(std::shared_ptr<AudioManager> audioManager) {
     this->audioManager = audioManager;
   }
@@ -101,6 +108,14 @@ private:
 
   std::vector<std::shared_ptr<Projectile>> projectiles;
   std::vector<std::shared_ptr<DisappearingPlatform>> disappearingPlatforms;
+
+  // Coin tracking for win condition
+  int totalCoins = 0;
+  int collectedCoins = 0;
+  std::vector<SDL_FRect>
+      originalCoinBounds; // Store original coin bounds (position and size)
+  std::shared_ptr<Texture> coinTexture; // Store coin texture for respawning
+  SDL_Rect coinSrcRect; // Store coin sprite source rect for respawning
 
   std::shared_ptr<AudioManager>
       audioManager;                // Optional audio manager for sound effects

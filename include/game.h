@@ -9,8 +9,8 @@
 #include "platform.h"
 #include "player.h"
 #include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_mixer.h>
+#include <SDL2/SDL_ttf.h>
 #include <memory>
 /**
  * SubSystemWrapper - RAII wrapper for SDL subsystem initialization and cleanup
@@ -146,6 +146,7 @@ private:
   // === Game State ===
   bool isRunning = false; // Main game loop control flag
   bool isPaused = false;  // Pause state control flag
+  bool hasWon = false;    // Win state control flag
 
   // === Game World ===
   SDL_Rect floor = {0, 300, 800, 50};   // Static floor collision rectangle
@@ -173,9 +174,19 @@ private:
   void renderPauseMenu();
 
   /**
+   * Render the win screen with celebration
+   */
+  void renderWinScreen();
+
+  /**
    * Handle pause toggle input
    */
   void handlePauseInput();
+
+  /**
+   * Reset game to initial state
+   */
+  void resetGame();
 
   /*
    * Music handling
@@ -183,12 +194,12 @@ private:
   std::shared_ptr<AudioManager> audioManager;
 
   // === Font Resources ===
-  std::unique_ptr<TTF_Font, void(*)(TTF_Font*)> font;
+  std::unique_ptr<TTF_Font, void (*)(TTF_Font *)> font;
 
   /**
    * Render text to a texture
    */
-  SDL_Texture* renderText(const char* text, SDL_Color color);
+  SDL_Texture *renderText(const char *text, SDL_Color color);
 };
 
 #endif // GAME_H

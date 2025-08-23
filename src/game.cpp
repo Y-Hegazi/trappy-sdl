@@ -141,8 +141,15 @@ void Game::handleEvents(SDL_Event &e) {
       SDL_RenderSetViewport(renderer.get(), nullptr);
       SDL_RenderSetScale(renderer.get(), static_cast<float>(w) / targetWidth,
                          static_cast<float>(h) / targetHeight);
-    } else if (e.type == SDL_KEYDOWN && e.key.keysym.scancode == KEY_PAUSE) {
-      isPaused = !isPaused; // Toggle pause state
+    } else if (e.type == SDL_KEYDOWN) {
+      if (e.key.keysym.scancode == KEY_PAUSE && !hasWon) {
+        isPaused = !isPaused; // Toggle pause state (only if not won)
+      } else if ((e.key.keysym.scancode == SDL_SCANCODE_SPACE ||
+                  e.key.keysym.scancode == KEY_JUMP_ALT2) &&
+                 hasWon) {
+        // Reset game when space is pressed after winning
+        resetGame();
+      }
     }
   }
 }
@@ -275,8 +282,8 @@ void Game::run() {
     // === INPUT & PHYSICS: Process input and update game state ===
     handleEvents(e); // Handle quit events and pause
 
-    // Only update game state if not paused
-    if (!isPaused) {
+    // Only update game state if not paused and not won
+    if (!isPaused && !hasWon) {
       updatePlayerPos(dt); // Handle movement input and physics
 
       // Update projectiles
@@ -303,6 +310,8 @@ void Game::run() {
           // Reset player position to start
           player->setPos(PLAYER_START_X, PLAYER_START_Y);
           player->setDead(false);
+          // Reset all coins when player dies
+          map->resetCoins();
         }
       }
 
@@ -311,6 +320,10 @@ void Game::run() {
         for (auto &projectile : map->getProjectiles()) {
           if (CollisionSystem::checkAABB(player->getCollisionBounds(),
                                          projectile->getCollisionBounds())) {
+            // Check if it's a coin before collision to track collection
+            bool wasCoin = (projectile->getProjectileType() ==
+                            Projectile::ProjectileType::COIN);
+
             // Handle collision directly instead of using private method
             float normalX, normalY, penetration;
             CollisionSystem::computeCollisionInfo(
@@ -322,8 +335,22 @@ void Game::run() {
                                 penetration);
             projectile->onCollision(player.get(), -normalX, -normalY,
                                     penetration);
+
+            // If a coin was collected, increment counter
+            if (wasCoin && projectile->shouldBeRemoved()) {
+              map->collectCoin();
+            }
           }
         }
+      }
+
+      // Check for win condition
+      if (map->areAllCoinsCollected() && !hasWon) {
+        hasWon = true;
+        audioManager->stopMusic(); // Stop background music
+        audioManager->playSound(PlayerSounds::WIN,
+                                -1); // Play win sound on loop
+        std::cout << "You collected all coins and won!" << std::endl;
       }
 
       // Remove dead projectiles and disappeared platforms
@@ -346,8 +373,13 @@ void Game::run() {
     }
 
     // Draw pause menu if paused
-    if (isPaused) {
+    if (isPaused && !hasWon) {
       renderPauseMenu();
+    }
+
+    // Draw win screen if won
+    if (hasWon) {
+      renderWinScreen();
     }
 
     // Present completed frame
@@ -548,4 +580,117 @@ void Game::renderPauseMenu() {
 
   // Reset blend mode
   SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_NONE);
+}
+
+/**
+ * Render the win screen with celebration text
+ */
+void Game::renderWinScreen() {
+  // Semi-transparent overlay background (darker than pause menu)
+  SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer.get(), 0, 0, 0,
+                         200); // Very dark semi-transparent
+  SDL_Rect overlayRect = {0, 0, targetWidth, targetHeight};
+  SDL_RenderFillRect(renderer.get(), &overlayRect);
+
+  // Victory background (bright gold/yellow)
+  SDL_SetRenderDrawColor(renderer.get(), 255, 215, 0, 255); // Gold color
+  SDL_Rect winRect = {targetWidth / 6, targetHeight / 3, targetWidth * 2 / 3,
+                      targetHeight / 3};
+  SDL_RenderFillRect(renderer.get(), &winRect);
+
+  // Win border (darker gold)
+  SDL_SetRenderDrawColor(renderer.get(), 218, 165, 32, 255); // Dark goldenrod
+  SDL_RenderDrawRect(renderer.get(), &winRect);
+
+  if (font) {
+    SDL_Color black = {0, 0, 0, 255};
+    SDL_Color darkBlue = {0, 0, 139, 255};
+
+    int centerX = targetWidth / 2;
+    int currentY = winRect.y + 30;
+
+    // Render some message title (large)
+    SDL_Texture *messageTexture = renderText("winMessage!", black);
+    if (messageTexture) {
+      int w, h;
+      SDL_QueryTexture(messageTexture, NULL, NULL, &w, &h);
+      // Make it bigger by scaling
+      w *= 3;
+      h *= 3;
+      SDL_Rect messageRect = {centerX - w / 2, currentY, w, h};
+      SDL_RenderCopy(renderer.get(), messageTexture, NULL, &messageRect);
+      SDL_DestroyTexture(messageTexture);
+      currentY += h + 20;
+    }
+
+    // Render "You collected all bananas!"
+    SDL_Texture *victoryTexture =
+        renderText("You collected all bananas!", darkBlue);
+    if (victoryTexture) {
+      int w, h;
+      SDL_QueryTexture(victoryTexture, NULL, NULL, &w, &h);
+      SDL_Rect victoryRect = {centerX - w / 2, currentY, w, h};
+      SDL_RenderCopy(renderer.get(), victoryTexture, NULL, &victoryRect);
+      SDL_DestroyTexture(victoryTexture);
+      currentY += h + 15;
+    }
+
+    // Render "Press SPACE to play again"
+    SDL_Texture *playAgainTexture =
+        renderText("Press SPACE to play again", black);
+    if (playAgainTexture) {
+      int w, h;
+      SDL_QueryTexture(playAgainTexture, NULL, NULL, &w, &h);
+      SDL_Rect playAgainRect = {centerX - w / 2, currentY, w, h};
+      SDL_RenderCopy(renderer.get(), playAgainTexture, NULL, &playAgainRect);
+      SDL_DestroyTexture(playAgainTexture);
+    }
+  } else {
+    // Fallback to rectangles if no font
+    // Large win message from earlier representation (big golden rectangle)
+    SDL_SetRenderDrawColor(renderer.get(), 255, 140, 0, 255); // Dark orange
+    SDL_Rect messageRect = {winRect.x + 20, winRect.y + 20, winRect.w - 40, 60};
+    SDL_RenderFillRect(renderer.get(), &messageRect);
+
+    // Victory message representation
+    SDL_SetRenderDrawColor(renderer.get(), 0, 100, 0, 255); // Dark green
+    SDL_Rect victoryRect = {winRect.x + 30, winRect.y + 100, winRect.w - 60,
+                            30};
+    SDL_RenderFillRect(renderer.get(), &victoryRect);
+
+    // Play again message representation
+    SDL_SetRenderDrawColor(renderer.get(), 0, 0, 100, 255); // Dark blue
+    SDL_Rect playAgainRect = {winRect.x + 40, winRect.y + 150, winRect.w - 80,
+                              25};
+    SDL_RenderFillRect(renderer.get(), &playAgainRect);
+  }
+
+  // Reset blend mode
+  SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_NONE);
+}
+
+/**
+ * Reset game to initial state for replay
+ */
+void Game::resetGame() {
+  hasWon = false;
+  isPaused = false;
+
+  // Reset player
+  if (player) {
+    player->setPos(PLAYER_START_X, PLAYER_START_Y);
+    player->setDead(false);
+  }
+
+  // Reset coins
+  if (map) {
+    map->resetCoins();
+  }
+
+  // Stop win sound and restart background music
+  audioManager->stopAll();
+  if (PLAY_MUSIC_DEFAULT) {
+    audioManager->playMusic();
+  }
 }
