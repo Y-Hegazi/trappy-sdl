@@ -227,6 +227,25 @@ void RectPlayer::update(float dt) {
     pos_y += vel_y;
   }
 
+  // Clamp player position to map boundaries
+  float mapWidth = DEFAULT_MAP_WIDTH * DEFAULT_TILE_WIDTH;
+  float mapHeight = DEFAULT_MAP_HEIGHT * DEFAULT_TILE_HEIGHT;
+
+  // Prevent going outside left/right boundaries
+  if (pos_x < 0) {
+    pos_x = 0;
+    vel_x = 0; // Stop horizontal movement when hitting boundary
+  } else if (pos_x + rect.w > mapWidth) {
+    pos_x = mapWidth - rect.w;
+    vel_x = 0; // Stop horizontal movement when hitting boundary
+  }
+
+  // Prevent going above the map (but allow falling below for death/respawn)
+  if (pos_y < 0) {
+    pos_y = 0;
+    vel_y = 0; // Stop upward movement when hitting top boundary
+  }
+
   // Update rect position
   rect.x = pos_x;
   rect.y = pos_y;

@@ -30,7 +30,11 @@ Game::Game(const char *name, const char *playerTexture, int windowWidth,
                    SDL_DestroyRenderer(renderer);
                }),
       playerTexturePath(playerTexture), targetWidth(windowWidth),
-      targetHeight(windowHeight), audioManager(nullptr) {
+      targetHeight(windowHeight), audioManager(nullptr),
+      font(nullptr, [](TTF_Font *f) {
+        if (f)
+          TTF_CloseFont(f);
+      }) {
 
   // Create main game window (windowWidth x windowHeight, centered on screen)
   window.reset(SDL_CreateWindow(
@@ -62,6 +66,18 @@ Game::Game(const char *name, const char *playerTexture, int windowWidth,
 void Game::init() {
   // Initialize high-resolution timer for precise delta time calculation
   perfFreq = SDL_GetPerformanceFrequency();
+
+  // Load default font for text rendering
+  font.reset(TTF_OpenFont(FONT_PATH, 16));
+  if (!font) {
+    // Try alternative font path
+    font.reset(TTF_OpenFont("/System/Library/Fonts/Arial.ttf", 16));
+    if (!font) {
+      // Create a simple fallback - we'll use rectangles if no font available
+      std::cout << "Warning: Could not load font: " << TTF_GetError()
+                << std::endl;
+    }
+  }
 
   // Initialize audio manager
   audioManager = std::make_shared<AudioManager>();
@@ -125,6 +141,8 @@ void Game::handleEvents(SDL_Event &e) {
       SDL_RenderSetViewport(renderer.get(), nullptr);
       SDL_RenderSetScale(renderer.get(), static_cast<float>(w) / targetWidth,
                          static_cast<float>(h) / targetHeight);
+    } else if (e.type == SDL_KEYDOWN && e.key.keysym.scancode == KEY_PAUSE) {
+      isPaused = !isPaused; // Toggle pause state
     }
   }
 }
@@ -152,8 +170,8 @@ void Game::handleEvents(SDL_Event &e) {
  * - Side collisions: stop horizontal movement, preserve vertical
  */
 void Game::updatePlayerPos(float dt) {
-  // Early return if player not initialized
-  if (!player)
+  // Early return if player not initialized or game is paused
+  if (!player || isPaused)
     return;
 
   const Uint8 *keyboardState = SDL_GetKeyboardState(NULL);
@@ -168,8 +186,9 @@ void Game::updatePlayerPos(float dt) {
   bool fastFall =
       (keyboardState[KEY_FAST_FALL] || keyboardState[KEY_FAST_FALL_ALT]) &&
       !player->grounded();
-  bool dash = keyboardState[KEY_DASH];
-  bool crouch = keyboardState[KEY_CROUCH] && player->grounded();
+  bool dash = keyboardState[KEY_DASH] || keyboardState[KEY_DASH_ALT];
+  bool crouch = keyboardState[KEY_CROUCH] && player->grounded() ||
+                keyboardState[KEY_CROUCH_ALT] && player->grounded();
 
   // Handle movement through the new system
   player->handleMovement(dt, moveLeft, moveRight, jump, fastFall, dash, crouch);
@@ -254,57 +273,63 @@ void Game::run() {
     t0 = t1;                                          // Update for next frame
 
     // === INPUT & PHYSICS: Process input and update game state ===
-    handleEvents(e);     // Handle quit events
-    updatePlayerPos(dt); // Handle movement input and physics
+    handleEvents(e); // Handle quit events and pause
 
-    // Update projectiles
-    map->updateProjectiles(dt);
+    // Only update game state if not paused
+    if (!isPaused) {
+      updatePlayerPos(dt); // Handle movement input and physics
 
-    // Update disappearing platforms
-    map->updateDisappearingPlatforms(dt);
+      // Update projectiles
+      map->updateProjectiles(dt);
 
-    // Apply layer-based status effects to player
-    if (player) {
-      // Check if player is on slow layer
-      bool onSlowLayer = map->isPlayerOnSlowLayer(player->getCollisionBounds());
-      player->setSlowed(onSlowLayer);
+      // Update disappearing platforms
+      map->updateDisappearingPlatforms(dt);
 
-      // Check if player died from trap layer
-      if (map->isPlayerOnTrapLayer(player->getCollisionBounds())) {
-        player->setDead(true);
-        audioManager->playSound(PlayerSounds::DEAD_BY_TRAP);
-      }
+      // Apply layer-based status effects to player
+      if (player) {
+        // Check if player is on slow layer
+        bool onSlowLayer =
+            map->isPlayerOnSlowLayer(player->getCollisionBounds());
+        player->setSlowed(onSlowLayer);
 
-      // Handle player death (simple respawn for now)
-      if (player->getDead()) {
-        // Reset player position to start
-        player->setPos(PLAYER_START_X, PLAYER_START_Y);
-        player->setDead(false);
-      }
-    }
+        // Check if player died from trap layer
+        if (map->isPlayerOnTrapLayer(player->getCollisionBounds())) {
+          player->setDead(true);
+          audioManager->playSound(PlayerSounds::DEAD_BY_TRAP);
+        }
 
-    // Check collisions between player and projectiles
-    if (player) {
-      for (auto &projectile : map->getProjectiles()) {
-        if (CollisionSystem::checkAABB(player->getCollisionBounds(),
-                                       projectile->getCollisionBounds())) {
-          // Handle collision directly instead of using private method
-          float normalX, normalY, penetration;
-          CollisionSystem::computeCollisionInfo(
-              player->getCollisionBounds(), projectile->getCollisionBounds(),
-              normalX, normalY, penetration);
-          // Call collision callbacks (projectile handles collection/damage
-          // logic)
-          player->onCollision(projectile.get(), normalX, normalY, penetration);
-          projectile->onCollision(player.get(), -normalX, -normalY,
-                                  penetration);
+        // Handle player death (simple respawn for now)
+        if (player->getDead()) {
+          // Reset player position to start
+          player->setPos(PLAYER_START_X, PLAYER_START_Y);
+          player->setDead(false);
         }
       }
-    }
 
-    // Remove dead projectiles and disappeared platforms
-    map->removeDeadProjectiles();
-    map->removeDisappearedPlatforms();
+      // Check collisions between player and projectiles
+      if (player) {
+        for (auto &projectile : map->getProjectiles()) {
+          if (CollisionSystem::checkAABB(player->getCollisionBounds(),
+                                         projectile->getCollisionBounds())) {
+            // Handle collision directly instead of using private method
+            float normalX, normalY, penetration;
+            CollisionSystem::computeCollisionInfo(
+                player->getCollisionBounds(), projectile->getCollisionBounds(),
+                normalX, normalY, penetration);
+            // Call collision callbacks (projectile handles collection/damage
+            // logic)
+            player->onCollision(projectile.get(), normalX, normalY,
+                                penetration);
+            projectile->onCollision(player.get(), -normalX, -normalY,
+                                    penetration);
+          }
+        }
+      }
+
+      // Remove dead projectiles and disappeared platforms
+      map->removeDeadProjectiles();
+      map->removeDisappearedPlatforms();
+    }
 
     // === RENDERING: Draw frame to screen ===
     // Clear screen to white background
@@ -317,8 +342,14 @@ void Game::run() {
 
     // Draw player sprite
     if (player) {
-      player->renderAnimation(renderer.get(), dt, true);
+      player->renderAnimation(renderer.get(), dt);
     }
+
+    // Draw pause menu if paused
+    if (isPaused) {
+      renderPauseMenu();
+    }
+
     // Present completed frame
     SDL_RenderPresent(renderer.get());
   }
@@ -337,4 +368,184 @@ void Game::run() {
  */
 Game::~Game() {
   // No manual cleanup needed - unique_ptr handles player cleanup automatically
+}
+
+/**
+ * Render text to a texture
+ */
+SDL_Texture *Game::renderText(const char *text, SDL_Color color) {
+  if (!font) {
+    return nullptr; // No font available
+  }
+
+  SDL_Surface *surface = TTF_RenderText_Solid(font.get(), text, color);
+  if (!surface) {
+    return nullptr;
+  }
+
+  SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer.get(), surface);
+  SDL_FreeSurface(surface);
+
+  return texture;
+}
+
+/**
+ * Render the pause menu with instructions
+ * Uses basic SDL rectangles to create a visual representation of the pause menu
+ * Since SDL_ttf is not available, this creates a simple overlay
+ */
+void Game::renderPauseMenu() {
+  // Semi-transparent overlay background
+  SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer.get(), 0, 0, 0, 180); // Dark semi-transparent
+  SDL_Rect overlayRect = {0, 0, targetWidth, targetHeight};
+  SDL_RenderFillRect(renderer.get(), &overlayRect);
+
+  // Main menu background (light gray)
+  SDL_SetRenderDrawColor(renderer.get(), 200, 200, 200, 255);
+  SDL_Rect menuRect = {targetWidth / 4, targetHeight / 4, targetWidth / 2,
+                       targetHeight / 2};
+  SDL_RenderFillRect(renderer.get(), &menuRect);
+
+  // Menu border (dark gray)
+  SDL_SetRenderDrawColor(renderer.get(), 100, 100, 100, 255);
+  SDL_RenderDrawRect(renderer.get(), &menuRect);
+
+  // If we have a font, render actual text
+  if (font) {
+    SDL_Color white = {255, 255, 255, 255};
+    SDL_Color black = {0, 0, 0, 255};
+    SDL_Color orange = {255, 165, 0, 255};
+
+    int currentY = menuRect.y + 20;
+    int centerX = menuRect.x + menuRect.w / 2;
+
+    // Render "GAME PAUSED" title
+    SDL_Texture *titleTexture = renderText("GAME PAUSED", black);
+    if (titleTexture) {
+      int w, h;
+      SDL_QueryTexture(titleTexture, NULL, NULL, &w, &h);
+      SDL_Rect titleRect = {centerX - w / 2, currentY, w, h};
+      SDL_RenderCopy(renderer.get(), titleTexture, NULL, &titleRect);
+      SDL_DestroyTexture(titleTexture);
+      currentY += h + 20;
+    }
+
+    // Render "HOW TO PLAY:" header
+    SDL_Texture *howToPlayTexture = renderText("HOW TO PLAY:", black);
+    if (howToPlayTexture) {
+      int w, h;
+      SDL_QueryTexture(howToPlayTexture, NULL, NULL, &w, &h);
+      SDL_Rect howToRect = {menuRect.x + 20, currentY, w, h};
+      SDL_RenderCopy(renderer.get(), howToPlayTexture, NULL, &howToRect);
+      SDL_DestroyTexture(howToPlayTexture);
+      currentY += h + 10;
+    }
+
+    // Render control instructions
+    const char *controls[] = {"A/D or Arrow Keys: Move Left/Right",
+                              "W/Space: Jump", "S: Fast Fall", "Shift: Dash",
+                              "Ctrl: Crouch"};
+
+    for (int i = 0; i < 5; i++) {
+      SDL_Texture *controlTexture = renderText(controls[i], black);
+      if (controlTexture) {
+        int w, h;
+        SDL_QueryTexture(controlTexture, NULL, NULL, &w, &h);
+        SDL_Rect controlRect = {menuRect.x + 30, currentY, w, h};
+        SDL_RenderCopy(renderer.get(), controlTexture, NULL, &controlRect);
+        SDL_DestroyTexture(controlTexture);
+        currentY += h + 5;
+      }
+    }
+
+    currentY += 15;
+
+    // Render objective
+    SDL_Texture *objectiveTexture =
+        renderText("COLLECT ALL BANANAS TO WIN!", orange);
+    if (objectiveTexture) {
+      int w, h;
+      SDL_QueryTexture(objectiveTexture, NULL, NULL, &w, &h);
+      SDL_Rect objectiveRect = {centerX - w / 2, currentY, w, h};
+      SDL_RenderCopy(renderer.get(), objectiveTexture, NULL, &objectiveRect);
+      SDL_DestroyTexture(objectiveTexture);
+      currentY += h + 15;
+    }
+
+    // Render resume instruction
+    SDL_Texture *resumeTexture = renderText("Press ESC to resume", black);
+    if (resumeTexture) {
+      int w, h;
+      SDL_QueryTexture(resumeTexture, NULL, NULL, &w, &h);
+      SDL_Rect resumeRect = {centerX - w / 2, currentY, w, h};
+      SDL_RenderCopy(renderer.get(), resumeTexture, NULL, &resumeRect);
+      SDL_DestroyTexture(resumeTexture);
+    }
+  } else {
+    // Fallback to rectangles if no font is available
+    // Title area (darker gray)
+    SDL_SetRenderDrawColor(renderer.get(), 150, 150, 150, 255);
+    SDL_Rect titleRect = {menuRect.x + 10, menuRect.y + 10, menuRect.w - 20,
+                          40};
+    SDL_RenderFillRect(renderer.get(), &titleRect);
+
+    // Create visual representations of text lines using colored rectangles
+    // "GAME PAUSED" title representation
+    SDL_SetRenderDrawColor(renderer.get(), 80, 80, 80, 255);
+    SDL_Rect pausedTextRect = {titleRect.x + 10, titleRect.y + 8,
+                               titleRect.w - 20, 24};
+    SDL_RenderFillRect(renderer.get(), &pausedTextRect);
+
+    // Instructions section
+    int currentY = titleRect.y + titleRect.h + 20;
+    int lineHeight = 25;
+    int lineWidth = menuRect.w - 40;
+    int textX = menuRect.x + 20;
+
+    // "HOW TO PLAY:" header
+    SDL_SetRenderDrawColor(renderer.get(), 60, 60, 60, 255);
+    SDL_Rect howToPlayRect = {textX, currentY, lineWidth / 2, 20};
+    SDL_RenderFillRect(renderer.get(), &howToPlayRect);
+    currentY += lineHeight;
+
+    // Movement controls representation
+    SDL_SetRenderDrawColor(renderer.get(), 120, 120, 120, 255);
+
+    // Control instruction rectangles
+    SDL_Rect moveRect = {textX, currentY, lineWidth - 50, 16};
+    SDL_RenderFillRect(renderer.get(), &moveRect);
+    currentY += lineHeight;
+
+    SDL_Rect jumpRect = {textX, currentY, lineWidth / 3, 16};
+    SDL_RenderFillRect(renderer.get(), &jumpRect);
+    currentY += lineHeight;
+
+    SDL_Rect fallRect = {textX, currentY, lineWidth / 3, 16};
+    SDL_RenderFillRect(renderer.get(), &fallRect);
+    currentY += lineHeight;
+
+    SDL_Rect dashRect = {textX, currentY, lineWidth / 4, 16};
+    SDL_RenderFillRect(renderer.get(), &dashRect);
+    currentY += lineHeight;
+
+    SDL_Rect crouchRect = {textX, currentY, lineWidth / 3, 16};
+    SDL_RenderFillRect(renderer.get(), &crouchRect);
+    currentY += lineHeight + 10;
+
+    // Objective section
+    SDL_SetRenderDrawColor(renderer.get(), 180, 140, 0,
+                           255); // Orange/yellow for bananas
+    SDL_Rect bananaObjectiveRect = {textX, currentY, lineWidth - 30, 18};
+    SDL_RenderFillRect(renderer.get(), &bananaObjectiveRect);
+    currentY += lineHeight + 10;
+
+    // Resume instruction
+    SDL_SetRenderDrawColor(renderer.get(), 80, 80, 80, 255);
+    SDL_Rect resumeRect = {textX, currentY, lineWidth - 50, 16};
+    SDL_RenderFillRect(renderer.get(), &resumeRect);
+  }
+
+  // Reset blend mode
+  SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_NONE);
 }

@@ -9,6 +9,7 @@
 #include "platform.h"
 #include "player.h"
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_mixer.h>
 #include <memory>
 /**
@@ -47,6 +48,12 @@ public:
       throw std::runtime_error("Failed to initialize SDL_mixer: " +
                                std::string(Mix_GetError()));
     }
+
+    // Initialize SDL_ttf
+    if (TTF_Init() == -1) {
+      throw std::runtime_error("Failed to initialize SDL_ttf: " +
+                               std::string(TTF_GetError()));
+    }
   }
 
   /**
@@ -54,6 +61,7 @@ public:
    * Automatically called when SubSystemWrapper goes out of scope
    */
   ~SubSystemWrapper() {
+    TTF_Quit();
     IMG_Quit();
     Mix_Quit();
     SDL_Quit();
@@ -137,6 +145,7 @@ private:
 
   // === Game State ===
   bool isRunning = false; // Main game loop control flag
+  bool isPaused = false;  // Pause state control flag
 
   // === Game World ===
   SDL_Rect floor = {0, 300, 800, 50};   // Static floor collision rectangle
@@ -158,10 +167,28 @@ private:
    */
   void updatePlayerPos(float dt);
 
+  /**
+   * Render the pause menu with instructions
+   */
+  void renderPauseMenu();
+
+  /**
+   * Handle pause toggle input
+   */
+  void handlePauseInput();
+
   /*
    * Music handling
    */
   std::shared_ptr<AudioManager> audioManager;
+
+  // === Font Resources ===
+  std::unique_ptr<TTF_Font, void(*)(TTF_Font*)> font;
+
+  /**
+   * Render text to a texture
+   */
+  SDL_Texture* renderText(const char* text, SDL_Color color);
 };
 
 #endif // GAME_H

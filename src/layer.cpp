@@ -101,12 +101,6 @@ void Layer::render(SDL_Renderer *renderer) const {
       } else
         sprite->setDestRect(tile->getCollisionBounds());
       sprite->render(renderer);
-      // for debug:
-      if (tile->getPlatformType() == PlatformType::TRAP) {
-        SDL_FRect bounding_box = tile->getCollisionBounds();
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        SDL_RenderDrawRectF(renderer, &bounding_box);
-      }
 
       // Reset alpha mod if we changed it
       if (opacity < 1.0f) {
