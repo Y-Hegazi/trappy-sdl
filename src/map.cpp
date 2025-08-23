@@ -8,7 +8,7 @@
 Map::Map(int width, int height, int tileSizeW, int tileSizeH,
          const std::string &tmxFilePath)
     : width(width), height(height), tileSizeW(tileSizeW), tileSizeH(tileSizeH),
-      tmxParser(tmxFilePath) {
+      tmxParser(tmxFilePath), audioManager(nullptr) {
   tiles.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
 }
 
@@ -91,6 +91,8 @@ void Map::init(SDL_Renderer *renderer) {
           spriteShared->setDestRect(bounds);
           coin->setSprite(spriteShared);
         }
+        // Set audio manager for coin sound
+        coin->setAudioManager(audioManager);
 
         // Add coin to map's projectile list so it will be updated and rendered
         // with the rest of projectiles.
@@ -218,7 +220,10 @@ void Map::init(SDL_Renderer *renderer) {
         }
 
         arrow->setVelocity(velocityX, velocityY);
-
+        // Add the sound effect
+        if (audioManager) {
+          arrow->setAudioManager(audioManager);
+        }
         projectiles.push_back(arrow);
       }
 

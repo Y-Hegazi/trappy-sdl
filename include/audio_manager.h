@@ -34,7 +34,7 @@ public:
    * @throws std::runtime_error if initialization fails
    */
   void init(int frequency = 44100, Uint16 format = MIX_DEFAULT_FORMAT,
-            int channels = 2, int chunksize = 2048);
+            int channels = 2, int chunksize = 512);
 
   /**
    * Load a sound effect from file and register it with an ID
@@ -143,6 +143,9 @@ constexpr const char *DEATH = "player_death";
 constexpr const char *DASH = "player_dash";
 constexpr const char *COLLECT_COIN = "player_collect_coin";
 constexpr const char *HIT_BY_ARROW = "player_hit_by_arrow";
+constexpr const char *DEAD_BY_TRAP = "player_dead_by_trap";
+constexpr const char *JUMP = "player_jump";
+constexpr const char *WIN = "player_win";
 } // namespace PlayerSounds
 
 #endif // AUDIO_MANAGER_H

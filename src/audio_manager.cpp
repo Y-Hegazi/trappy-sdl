@@ -1,4 +1,5 @@
 #include "../include/audio_manager.h"
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 

@@ -5,6 +5,7 @@
 #include "config.h"
 #include "map.h"
 
+#include "audio_manager.h"
 #include "platform.h"
 #include "player.h"
 #include <SDL2/SDL_image.h>
@@ -158,14 +159,9 @@ private:
   void updatePlayerPos(float dt);
 
   /*
-   * Music handling methods
+   * Music handling
    */
-
-  void loadBackgroundMusic(const char *file);
-  void playBackgroundMusic();
-  void stopBackgroundMusic();
-  void setBackgroundMusicVolume(int volume);
-  int getBackgroundMusicVolume() const;
+  std::shared_ptr<AudioManager> audioManager;
 };
 
 #endif // GAME_H

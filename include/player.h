@@ -1,6 +1,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
+#include "audio_manager.h"
 #include "collideable.h"
 #include "config.h"
 #include "sprite.h"
@@ -24,6 +25,9 @@ public:
   void setVel(float vel_x, float vel_y);
   std::pair<float, float> getVel() const;
   Sprite *getSprite() const;
+
+  // Audio
+  void setAudioManager(std::shared_ptr<AudioManager> audioMgr);
 
   // Animation
   void setAnimation(const std::vector<SDL_Rect> &frames, float frameTime);
@@ -91,6 +95,8 @@ private:
   MovementState previousState;
   std::shared_ptr<Texture> texture;
   std::unique_ptr<Sprite> sprite;
+
+  std::shared_ptr<AudioManager> audioManager;
 
   SDL_FRect rect;
   float pos_x, pos_y;

@@ -11,7 +11,7 @@ RectPlayer::RectPlayer(SDL_FRect rect_in, std::shared_ptr<Texture> texture)
       crouching(false), dashing(false), dashSpeed(PLAYER_DASH_SPEED),
       dashDuration(PLAYER_DASH_DURATION), dashTimer(0.f),
       dashCooldown(PLAYER_DASH_COOLDOWN), dashCooldownTimer(0.f),
-      dashDirection(Direction::RIGHT) {
+      dashDirection(Direction::RIGHT), audioManager(nullptr) {
 
   if (!texture) {
     throw std::invalid_argument("Texture shared_ptr must not be null");
@@ -158,6 +158,12 @@ void RectPlayer::handleMovement(float dt, bool moveLeft, bool moveRight,
   // Jump handling
   if (jump) {
     if (onGround) {
+      // Play sound effect if u want, Too Annoying for me
+      /*
+      if (audioManager) {
+        audioManager->playSound(PlayerSounds::JUMP);
+      }
+      */
       // Initial jump
       isJumping = true;
       setGrounded(false);
@@ -295,6 +301,13 @@ void RectPlayer::startDash(Direction direction) {
   dashDirection = direction;
   dashTimer = 0.0f;
   isJumping = false; // Cancel jump when dashing
+
+  // Play sound effect if u want, Too Annoying for me
+  /*
+  if (audioManager) {
+    audioManager->playSound(PlayerSounds::DASH);
+  }
+  */
 }
 
 void RectPlayer::updateDash(float dt) {
@@ -454,4 +467,8 @@ float RectPlayer::getEffectiveJumpForce() const {
     baseJump *= SLOW_JUMP_MULTIPLIER;
   }
   return baseJump;
+}
+
+void RectPlayer::setAudioManager(std::shared_ptr<AudioManager> audioMgr) {
+  audioManager = audioMgr;
 }

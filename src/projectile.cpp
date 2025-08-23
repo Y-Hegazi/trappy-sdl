@@ -1,10 +1,11 @@
 #include "../include/projectile.h"
 #include "../include/player.h"
 #include <cmath>
-
+#include <iostream>
 Projectile::Projectile(const SDL_FRect &b, ProjectileType type,
                        std::shared_ptr<Texture> tex)
-    : bounds(b), projectileType(type), texture(std::move(tex)) {
+    : bounds(b), projectileType(type), texture(std::move(tex)),
+      audioManager(nullptr) {
   // Create sprite if texture is provided
   if (texture) {
     sprite = std::make_unique<Sprite>(texture.get());
@@ -89,6 +90,10 @@ void Projectile::setSpriteSrcRect(const SDL_Rect &srcRect) {
   }
 }
 
+void Projectile::setAudioManager(std::shared_ptr<AudioManager> audioMgr) {
+  audioManager = audioMgr;
+}
+
 void Projectile::onCollision(Collideable *other, float normalX, float normalY,
                              float penetration) {
   ObjectType otherType = other->getType();
@@ -97,13 +102,19 @@ void Projectile::onCollision(Collideable *other, float normalX, float normalY,
     if (projectileType == ProjectileType::COIN) {
       // Coin collected - mark for removal
       markForRemoval();
-      // put sound here
+      // play sound effect
+      if (audioManager) {
+        audioManager->playSound(PlayerSounds::COLLECT_COIN);
+      }
       // Add score
     } else if (projectileType == ProjectileType::ARROW) {
       // Arrow hits player - kill player and respawn arrow
       RectPlayer *player = static_cast<RectPlayer *>(other);
       player->setDead(true);
-      // put sound here
+      // play sound effect
+      if (audioManager) {
+        audioManager->playSound(PlayerSounds::HIT_BY_ARROW);
+      }
     }
   } else if (otherType == ObjectType::STATIC_OBJECT) {
     // Projectile hits wall/platform

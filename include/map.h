@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio_manager.h"
 #include "collideable.h"
 #include "config.h"
 #include "disappearing_platform.h"
@@ -77,6 +78,10 @@ public:
   bool isPlayerOnSlowLayer(const SDL_FRect &playerBounds) const;
   bool isPlayerOnTrapLayer(const SDL_FRect &playerBounds) const;
 
+  void setAudioManager(std::shared_ptr<AudioManager> audioManager) {
+    this->audioManager = audioManager;
+  }
+
 private:
   TMXParser tmxParser;
   int width;
@@ -97,5 +102,7 @@ private:
   std::vector<std::shared_ptr<Projectile>> projectiles;
   std::vector<std::shared_ptr<DisappearingPlatform>> disappearingPlatforms;
 
+  std::shared_ptr<AudioManager>
+      audioManager;                // Optional audio manager for sound effects
   std::shared_ptr<Texture> assets; // Optional texture for rendering
 };

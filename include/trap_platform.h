@@ -3,7 +3,7 @@
 
 #include "config.h"
 #include "platform.h"
-
+#include <iostream>
 /**
  * Platform that kills the player on contact and has a reduced collision box
  */

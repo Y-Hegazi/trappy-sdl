@@ -22,10 +22,5 @@ void TrapPlatform::onCollision(Collideable *other, float normalX, float normalY,
                                float penetration) {
   // Call parent collision handling first
   Platform::onCollision(other, normalX, normalY, penetration);
-
-  // Kill the player if they touch the trap
-  if (other->getType() == ObjectType::PLAYER) {
-    RectPlayer *player = static_cast<RectPlayer *>(other);
-    player->setDead(true);
-  }
+  // killing player is handled in game.cpp
 }

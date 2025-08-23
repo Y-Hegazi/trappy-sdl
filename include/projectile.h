@@ -1,6 +1,7 @@
 #ifndef PROJECTILE_H
 #define PROJECTILE_H
 
+#include "audio_manager.h"
 #include "collideable.h"
 #include "config.h"
 #include "platform.h"
@@ -50,16 +51,18 @@ public:
   bool shouldBeRemoved() const { return shouldRemove; }
 
   // Arrow respawn functionality
-  void setOriginalPosition(float x, float y) { 
-    originalX = x; 
-    originalY = y; 
+  void setOriginalPosition(float x, float y) {
+    originalX = x;
+    originalY = y;
   }
   void resetToOriginalPosition() {
     bounds.x = originalX;
     bounds.y = originalY;
     shouldRemove = false;
   }
-  std::pair<float, float> getOriginalPosition() const { return {originalX, originalY}; }
+  std::pair<float, float> getOriginalPosition() const {
+    return {originalX, originalY};
+  }
 
   // Rendering
   std::shared_ptr<Texture> getTexture() const { return texture; }
@@ -74,11 +77,14 @@ public:
   void setSpriteSrcRect(const SDL_Rect &srcRect);
   void render(SDL_Renderer *renderer) const;
 
+  void setAudioManager(std::shared_ptr<AudioManager> audioMgr);
+
 private:
   SDL_FRect bounds;
   ProjectileType projectileType;
   std::shared_ptr<Texture> texture;
   std::shared_ptr<Sprite> sprite;
+  std::shared_ptr<AudioManager> audioManager;
 
   // Physics
   float vel_x = 0.0f;
@@ -96,7 +102,7 @@ private:
 
   // State
   bool shouldRemove = false;
-  
+
   // Arrow respawn system
   float originalX = 0.0f;
   float originalY = 0.0f;

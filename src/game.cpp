@@ -30,7 +30,7 @@ Game::Game(const char *name, const char *playerTexture, int windowWidth,
                    SDL_DestroyRenderer(renderer);
                }),
       playerTexturePath(playerTexture), targetWidth(windowWidth),
-      targetHeight(windowHeight) {
+      targetHeight(windowHeight), audioManager(nullptr) {
 
   // Create main game window (windowWidth x windowHeight, centered on screen)
   window.reset(SDL_CreateWindow(
@@ -63,6 +63,25 @@ void Game::init() {
   // Initialize high-resolution timer for precise delta time calculation
   perfFreq = SDL_GetPerformanceFrequency();
 
+  // Initialize audio manager
+  audioManager = std::make_shared<AudioManager>();
+  audioManager->init();
+
+  audioManager->loadMusic(PATH_TO_MUSIC);
+
+  // Preload all player sounds
+  audioManager->loadSound(PlayerSounds::DEAD_BY_TRAP,
+                          PATH_TO_DEAD_BY_TRAP_SOUND);
+  audioManager->loadSound(PlayerSounds::WIN, PATH_TO_WIN_SOUND);
+  audioManager->loadSound(PlayerSounds::JUMP, PATH_TO_JUMP_SOUND);
+  audioManager->loadSound(PlayerSounds::DASH, PATH_TO_DASH_SOUND);
+  audioManager->loadSound(PlayerSounds::COLLECT_COIN,
+                          PATH_TO_COLLECT_COIN_SOUND);
+  audioManager->loadSound(PlayerSounds::HIT_BY_ARROW,
+                          PATH_TO_HIT_BY_ARROW_SOUND);
+
+  PLAY_MUSIC_DEFAULT ? audioManager->playMusic() : []() {};
+
   // Create player at starting position with texture
   auto playerTexture =
       std::make_shared<Texture>(renderer.get(), PLAYER_TEXTURE_PATH);
@@ -72,10 +91,12 @@ void Game::init() {
       playerTexture);
 
   player->init();
+  player->setAudioManager(audioManager);
 
   map = std::make_unique<Map>(DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT,
                               DEFAULT_TILE_WIDTH, DEFAULT_TILE_HEIGHT,
                               MAP_FILE_PATH);
+  map->setAudioManager(audioManager);
 
   map->init(renderer.get());
 }
@@ -166,7 +187,7 @@ void Game::updatePlayerPos(float dt) {
 
     bool stillOnGround = false;
 
-    // Check against map tiles instead of hardcoded platforms
+    // Check against map tiles
     auto nearbyTiles = map->getTilesInRect(groundCheckBounds);
     for (auto &tile : nearbyTiles) {
       if (CollisionSystem::checkAABB(groundCheckBounds,
@@ -251,6 +272,7 @@ void Game::run() {
       // Check if player died from trap layer
       if (map->isPlayerOnTrapLayer(player->getCollisionBounds())) {
         player->setDead(true);
+        audioManager->playSound(PlayerSounds::DEAD_BY_TRAP);
       }
 
       // Handle player death (simple respawn for now)

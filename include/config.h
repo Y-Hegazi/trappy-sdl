@@ -124,5 +124,13 @@
 // === AUDIO SETTINGS ===
 #define SOUND_EFFECT_VOLUME 128 // Max 128
 #define MUSIC_VOLUME 128
+#define PLAY_MUSIC_DEFAULT true
+#define PATH_TO_MUSIC "../resources/music.mp3"
+#define PATH_TO_DEAD_BY_TRAP_SOUND "../resources/dead_by_trap.wav"
+#define PATH_TO_HIT_BY_ARROW_SOUND "../resources/hit_by_arrow.wav"
+#define PATH_TO_COLLECT_COIN_SOUND "../resources/collect_coin.wav"
+#define PATH_TO_DASH_SOUND "../resources/dash.wav"
+#define PATH_TO_JUMP_SOUND "../resources/jump.wav"
+#define PATH_TO_WIN_SOUND "../resources/win_music.mp3"
 
 #endif // CONFIG_H
